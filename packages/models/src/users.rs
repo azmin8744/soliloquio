@@ -11,6 +11,8 @@ pub struct Model {
     pub email: String,
     #[sea_orm(column_type = "Text")]
     pub password: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub refresh_token: Option<String>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }

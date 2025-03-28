@@ -12,6 +12,7 @@ create table users (
     id uuid primary key,
     email text not null,
     password text not null,
+    refresh_token text,
     created_at timestamp default current_timestamp,
     updated_at timestamp default current_timestamp
 );
