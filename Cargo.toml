@@ -1,4 +1,4 @@
-workspace = { members = ["packages/graphql"] }
+workspace = { members = ["packages/graphql", "tools/schema"] }
 [package]
 name = "soliloquio"
 version = "0.1.0"
@@ -9,10 +9,11 @@ edition = "2021"
 [dependencies]
 futures = "0.3"
 uuid = "1.9.1"
-async-graphql = { version = "7.0.6", features = [ "uuid", "chrono", "chrono-tz" ] }
-async-graphql-rocket = "7.0.6"
+async-graphql = { version = "7.0.11", features = [ "uuid", "chrono", "chrono-tz" ] }
+async-graphql-actix-web = "7.0.11"
 serde_json = "1.0.18"
 sea-orm = { version = "^0.12.0", features = [ "sqlx-postgres", "runtime-async-std-native-tls", "macros" ] }
-rocket = { version = "^0.5.0", features = ["json"] }
+actix-web = "4"
 models = { path = "./packages/models" }
 graphql = { path = "./packages/graphql" }
+services = { path = "./packages/services" }
