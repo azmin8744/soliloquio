@@ -6,10 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-graphql = { version = "7.0.6", features = [ "uuid", "chrono", "chrono-tz" ] }
+async-graphql = { version = "7.0.11", features = [ "uuid", "chrono", "chrono-tz" ] }
 chrono = { version = "0.4.38" }
 sea-orm = { version = "^0.12.0", features = [ "sqlx-postgres", "runtime-async-std-native-tls", "macros" ] }
 uuid = { version = "1.9.1", features = [ "v4", "fast-rng", "macro-diagnostics" ]}
 models = { path = "../models" }
+services = { path = "../services" }
 password-hash = { version = "0.5.0", default-features = false, features = ["rand_core"] }
 argon2 = { version = "0.5.3", features = ["default"] }
+futures-util = "0.3.0"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+base64 = { version = "^0.22.1" }

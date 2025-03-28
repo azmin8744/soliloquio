@@ -10,7 +10,9 @@ use argon2::{
     },
     Argon2
 };
-use crate::types::user::User as UserType;
+use crate::types::authorized_user::AuthorizedUser;
+use services::authentication::token::{Token, generate_token};
+use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 
 #[derive(Debug)]
 struct SignInError{
@@ -45,25 +47,29 @@ impl From<argon2::password_hash::Error> for SignInError {
 pub struct UserMutation;
 
 trait UserMutations {
-    async fn sign_up(&self, ctx: &Context<'_>, email: String, password: String) -> Result<UserType, SignInError>;
-    async fn sign_in(&self, ctx: &Context<'_>, email: String, password: String) -> Result<UserType, SignInError>;
+    async fn sign_up(&self, ctx: &Context<'_>, email: String, password: String) -> Result<AuthorizedUser, SignInError>;
+    async fn sign_in(&self, ctx: &Context<'_>, email: String, password: String) -> Result<AuthorizedUser, SignInError>;
 }
-
 
 #[Object]
 impl UserMutations for UserMutation {
-    async fn sign_up(&self, ctx: &Context<'_>, email: String, password: String) -> Result<UserType, SignInError> {
+    async fn sign_up(&self, ctx: &Context<'_>, email: String, password: String) -> Result<AuthorizedUser, SignInError> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
         // ソルトをランダムに生成する
         let salt = SaltString::generate(&mut OsRng);
         // パスワードをscryptでハッシュ化する
         let argon2 = Argon2::default();
         let password_hash = argon2.hash_password(&password.into_bytes(), &salt)?.to_string();
+        
+        // リフレッシュトークンを生成する
+        // UUID を base64 エンコードしてリフレッシュトークンとする
+        let refresh_token = URL_SAFE.encode(Uuid::new_v4().to_string());
         // User モデルを作ってinsertする
         let user = users::ActiveModel {
             id: ActiveValue::set(Uuid::new_v4()),
             email: ActiveValue::set(email),
             password: ActiveValue::set(password_hash),
+            refresh_token: ActiveValue::set(Some(refresh_token)),
             ..Default::default()
         };
 
@@ -73,16 +79,17 @@ impl UserMutations for UserMutation {
         .one(db)
         .await?
         .unwrap();
-
-        Ok::<UserType, SignInError>(UserType {
-            id: res.last_insert_id,
-            email: user.email,
-            created_at: user.created_at,
-            updated_at: user.updated_at,
+        
+        // JWT トークンを生成する
+        let token = generate_token(&user);
+        // AuthorizedUser を返す
+        Ok::<AuthorizedUser, SignInError>(AuthorizedUser {
+            token: token,
+            refresh_token: user.refresh_token.unwrap(),
         })
     }
 
-    async fn sign_in(&self, ctx: &Context<'_>, email: String, password: String) -> Result<UserType, SignInError> {
+    async fn sign_in(&self, ctx: &Context<'_>, email: String, password: String) -> Result<AuthorizedUser, SignInError> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
         let user = Users::find()
         .filter(users::Column::Email.contains(email))
@@ -93,15 +100,13 @@ impl UserMutations for UserMutation {
         let parsed_hash = PasswordHash::new(&user.password)?;
 
         let user = match Argon2::default().verify_password(&password.into_bytes(), &parsed_hash) {
-            Ok(_) => UserType {
-                id: user.id,
-                email: user.email,
-                created_at: user.created_at,
-                updated_at: user.updated_at,
+            Ok(_) => AuthorizedUser {
+                token: generate_token(&user),
+                refresh_token: user.refresh_token.unwrap(),
             },
             Err(_) => return Err(SignInError { message: "Password is incorrect".to_string() }),
         };
         
-        Ok::<UserType, SignInError>(user)
+        Ok::<AuthorizedUser, SignInError>(user)
     }
 }
