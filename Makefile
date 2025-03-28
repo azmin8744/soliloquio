@@ -1,5 +1,8 @@
 SRCS = schema.sql
 
+
+.PHONY: restore_database restore_schema reset_database graphql_schema
+
 entity:
 	PGPASSWORD=${POSTGRES_PASSWORD} sea-orm-cli generate entity -u "postgres://postgres@localhost:5432/$(DB_NAME)" -o ./packages/models/src -l
 
@@ -8,7 +11,9 @@ restore_database:
 	PGPASSWORD=$(POSTGRES_PASSWORD) psql -U postgres -h localhost -c "CREATE DATABASE $(DB_NAME);"
 
 restore_schema:
-	psqldef -U postgres -h localhost $(DB_NAME) < schema.sql
+	PGPASSWORD=$(POSTGRES_PASSWORD) psql -U postgres -h localhost $(DB_NAME) < schema.sql
 
-reset_database:
-	restore_database restore_schema
+reset_database: restore_database restore_schema
+
+graphql_schema:
+	cd tools/schema && cargo run > ../../schema.graphql

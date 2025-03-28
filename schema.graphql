@@ -1,0 +1,64 @@
+type AuthorizedUser {
+	token: String!
+	refreshToken: String!
+}
+
+
+
+
+
+type Mutations {
+	addPost(title: String!, body: String!): Post!
+	signUp(email: String!, password: String!): AuthorizedUser!
+	signIn(email: String!, password: String!): AuthorizedUser!
+}
+
+"""
+ISO 8601 combined date and time without timezone.
+
+# Examples
+
+* `2015-07-01T08:59:60.123`,
+"""
+scalar NaiveDateTime
+
+type Post {
+	id: UUID!
+	title: String!
+	body: String!
+	publishedAt: NaiveDateTime
+	createdAt: NaiveDateTime
+	updatedAt: NaiveDateTime
+}
+
+type Queries {
+	posts: [Post!]!
+	post(id: UUID!): Post
+}
+
+
+type Subscriptions {
+	values: Int!
+}
+
+"""
+A UUID is a unique 128-bit number, stored as 16 octets. UUIDs are parsed as
+Strings within GraphQL. UUIDs are used to assign unique identifiers to
+entities without requiring a central allocating authority.
+
+# References
+
+* [Wikipedia: Universally Unique Identifier](http://en.wikipedia.org/wiki/Universally_unique_identifier)
+* [RFC4122: A Universally Unique IDentifier (UUID) URN Namespace](http://tools.ietf.org/html/rfc4122)
+"""
+scalar UUID
+
+directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+directive @specifiedBy(url: String!) on SCALAR
+schema {
+	query: Queries
+	mutation: Mutations
+	subscription: Subscriptions
+}
+
