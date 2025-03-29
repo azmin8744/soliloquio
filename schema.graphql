@@ -4,11 +4,15 @@ type AuthorizedUser {
 }
 
 
+type DbErr {
+	message: String!
+}
+
 
 
 
 type Mutations {
-	addPost(title: String!, body: String!): Post!
+	addPost(title: String!, body: String!): PostMutationResult!
 	signUp(email: String!, password: String!): AuthorizedUser!
 	signIn(email: String!, password: String!): AuthorizedUser!
 }
@@ -30,6 +34,8 @@ type Post {
 	createdAt: NaiveDateTime
 	updatedAt: NaiveDateTime
 }
+
+union PostMutationResult = Post | DbErr
 
 type Queries {
 	posts: [Post!]!
