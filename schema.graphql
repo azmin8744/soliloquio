@@ -1,3 +1,7 @@
+type AuthError {
+	message: String!
+}
+
 type AuthorizedUser {
 	token: String!
 	refreshToken: String!
@@ -35,7 +39,7 @@ type Post {
 	updatedAt: NaiveDateTime
 }
 
-union PostMutationResult = Post | DbErr
+union PostMutationResult = Post | DbErr | AuthError
 
 type Queries {
 	posts: [Post!]!
