@@ -5,10 +5,12 @@ use std::error::Error;
 use models::{prelude::*, *};
 use sea_orm::entity::prelude::Uuid;
 use crate::types::post::Post as PostType;
+use crate::utilities::requires_auth::RequiresAuth;
 use services::authentication::token::Token;
+use services::authentication::authenticator::*;
 
 #[derive(SimpleObject, Debug)]
-struct DbErr {
+pub struct DbErr {
     message: String,
 }
 
@@ -25,12 +27,12 @@ impl fmt::Display for DbErr {
 }
 
 #[derive(SimpleObject, Debug)]
-struct AuthError {
+pub struct AuthError {
     message: String,
 }
-impl From<services::authentication::token::AuthError> for AuthError {
-    fn from(e: services::authentication::token::AuthError) -> Self {
-        AuthError { message: e.message }
+impl From<crate::utilities::requires_auth::AuthenticationError> for AuthError {
+    fn from(e: crate::utilities::requires_auth::AuthenticationError) -> Self {
+        AuthError { message: e.to_string() }
     }
 }
 impl fmt::Display for AuthError {
@@ -53,38 +55,19 @@ trait PostMutations {
     async fn add_post(&self, ctx: &Context<'_>, title: String, body: String) -> Result<PostMutationResult>;
 }
 
+impl RequiresAuth for PostMutation {}
+
 #[Object]
 impl PostMutations for PostMutation {
     async fn add_post(&self, ctx: &Context<'_>, title: String, body: String) -> Result<PostMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
-        let token = match ctx.data::<Token>() {
-            Ok(token) => token,
-            Err(e) => {
-                return Ok(PostMutationResult::AuthError(AuthError {
-                    message: "Token not found".to_string(),
-                }));
-            }
-        };
-
-        let user_id = match token.get_user_id() {
-            Ok(user_id) => user_id,
+        let user = match self.require_authenticate_as_user(ctx).await {
+            Ok(user) => user,
             Err(e) => {
                 return Ok(PostMutationResult::AuthError(AuthError {
                     message: e.to_string(),
                 }));
-            }
-        };
-
-        let user = match users::Entity::find_by_id(user_id).one(db).await {
-            Ok(Some(user)) => user,
-            Ok(None) => {
-                return Ok(PostMutationResult::AuthError(AuthError {
-                    message: "User not found".to_string(),
-                }));
-            }
-            Err(e) => {
-                return Ok(PostMutationResult::DbError(DbErr::from(e)));
             }
         };
 
@@ -99,7 +82,9 @@ impl PostMutations for PostMutation {
         let res = match Posts::insert(post).exec(db).await {
             Ok(res) => res,
             Err(e) => {
-                return Ok(PostMutationResult::DbError(DbErr::from(e)));
+                return Ok(PostMutationResult::DbError(DbErr {
+                    message: e.to_string(),
+                }));
             }
         };
         
@@ -111,12 +96,14 @@ impl PostMutations for PostMutation {
                 }));
             }
             Err(e) => {
-                return Ok(PostMutationResult::DbError(DbErr::from(e)));
+                return Ok(PostMutationResult::DbError(DbErr {
+                    message: e.to_string(),
+                }));
             }
         };
 
         Ok(PostMutationResult::PostType(PostType {
-            id: res.last_insert_id,
+            id: p.id,
             title: p.title,
             body: p.body,
             published_at: p.published_at,
