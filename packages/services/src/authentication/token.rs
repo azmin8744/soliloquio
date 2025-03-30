@@ -3,7 +3,7 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, 
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 use std::{env, fmt};
-use models::{prelude::*, *};
+use models::users::Model as User;
 
 pub struct Token(pub String);
 pub struct AuthError {
@@ -37,7 +37,7 @@ impl Token {
     }
 }
 
-pub fn generate_token(user: &users::Model) -> String {
+pub fn generate_token(user: &User) -> String {
     let expiration = Utc::now().checked_add_signed(Duration::seconds(expiration())).unwrap();
     let host_name = env::var("HOST_NAME").unwrap();
     let claims = Claims {
