@@ -11,7 +11,7 @@ use argon2::{
     Argon2
 };
 use crate::types::authorized_user::AuthorizedUser;
-use services::authentication::token::{Token, generate_token};
+use services::authentication::token::generate_token;
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 
 #[derive(Debug)]

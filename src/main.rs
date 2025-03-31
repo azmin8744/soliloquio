@@ -1,7 +1,7 @@
 use actix_web::{
     guard, http::header::HeaderMap, web, App, HttpRequest, HttpResponse, HttpServer, Result,
 };
-use async_graphql::{http::GraphiQLSource, EmptySubscription, Schema};
+use async_graphql::{http::GraphiQLSource, Schema};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 mod setup;
 use setup::set_up_db;

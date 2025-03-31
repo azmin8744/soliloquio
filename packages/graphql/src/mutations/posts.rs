@@ -1,13 +1,10 @@
 use async_graphql::{Context, Object, SimpleObject, Union, Result};
 use sea_orm::*;
 use std::fmt;
-use std::error::Error;
 use models::{prelude::*, *};
 use sea_orm::entity::prelude::Uuid;
 use crate::types::post::Post as PostType;
 use crate::utilities::requires_auth::RequiresAuth;
-use services::authentication::token::Token;
-use services::authentication::authenticator::*;
 
 #[derive(SimpleObject, Debug)]
 pub struct DbErr {
