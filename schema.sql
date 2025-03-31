@@ -10,7 +10,7 @@ create table posts (
 
 create table users (
     id uuid primary key,
-    email text not null,
+    email text not null unique,
     password text not null,
     refresh_token text,
     created_at timestamp default current_timestamp,
