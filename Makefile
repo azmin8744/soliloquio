@@ -15,5 +15,8 @@ restore_schema:
 
 reset_database: restore_database restore_schema
 
+migrate:
+	PGPASSWORD=$(POSTGRES_PASSWORD) psqldef -U postgres -h localhost $(DB_NAME) < schema.sql
+
 graphql_schema:
 	cd tools/schema && cargo run > ../../schema.graphql
