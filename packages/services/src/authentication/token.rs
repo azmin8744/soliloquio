@@ -56,12 +56,12 @@ pub fn generate_token(user: &User) -> String {
     encode(&Header::default(), &claims, &EncodingKey::from_secret(secret().as_ref())).unwrap()
 }
 
-pub fn generate_refresh_token(user: &User) -> String {
+pub fn generate_refresh_token(user_id: String) -> String {
     let expiration = Utc::now().checked_add_signed(Duration::days(refresh_token_expiration())).unwrap();
     let host_name = env::var("HOST_NAME").unwrap();
     let claims = Claims {
         iss: host_name,
-        sub: user.id.clone().to_string(),
+        sub: user_id,
         exp: expiration.timestamp(),
         iat: Utc::now().timestamp(),
         jti: Uuid::new_v4().to_string(),
