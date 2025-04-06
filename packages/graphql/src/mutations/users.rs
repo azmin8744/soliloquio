@@ -11,7 +11,8 @@ use argon2::{
     Argon2
 };
 use crate::types::authorized_user::AuthorizedUser;
-use services::authentication::token::generate_token;
+use services::authentication::token::{Token, generate_token, generate_refresh_token};
+use services::authentication::authenticator;
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 
 #[derive(Debug)]
@@ -43,12 +44,27 @@ impl From<argon2::password_hash::Error> for SignInError {
     }
 }
 
+pub struct AuthError {
+    message: String,
+}
+impl From<services::AuthenticationError> for AuthError {
+    fn from(e: services::AuthenticationError) -> Self {
+        AuthError { message: e.to_string() }
+    }
+}
+impl fmt::Display for AuthError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.message.as_str())
+    }
+}
+
 #[derive(Default)]
 pub struct UserMutation;
 
 trait UserMutations {
     async fn sign_up(&self, ctx: &Context<'_>, email: String, password: String) -> Result<AuthorizedUser, SignInError>;
     async fn sign_in(&self, ctx: &Context<'_>, email: String, password: String) -> Result<AuthorizedUser, SignInError>;
+    async fn refresh_access_token(&self, ctx: &Context<'_>, refresh_token: String) -> Result<AuthorizedUser, AuthError>;
 }
 
 #[Object]
@@ -61,15 +77,11 @@ impl UserMutations for UserMutation {
         let argon2 = Argon2::default();
         let password_hash = argon2.hash_password(&password.into_bytes(), &salt)?.to_string();
         
-        // リフレッシュトークンを生成する
-        // UUID を base64 エンコードしてリフレッシュトークンとする
-        let refresh_token = URL_SAFE.encode(Uuid::new_v4().to_string());
         // User モデルを作ってinsertする
         let user = users::ActiveModel {
             id: ActiveValue::set(Uuid::new_v4()),
             email: ActiveValue::set(email),
             password: ActiveValue::set(password_hash),
-            refresh_token: ActiveValue::set(Some(refresh_token)),
             ..Default::default()
         };
 
@@ -80,12 +92,11 @@ impl UserMutations for UserMutation {
         .await?
         .unwrap();
         
-        // JWT トークンを生成する
-        let token = generate_token(&user);
+        // アクセストークンとリフレッシュトークンを生成する
         // AuthorizedUser を返す
         Ok::<AuthorizedUser, SignInError>(AuthorizedUser {
-            token: token,
-            refresh_token: user.refresh_token.unwrap(),
+            token: generate_token(&user),
+            refresh_token: generate_refresh_token(&user),
         })
     }
 
@@ -108,5 +119,16 @@ impl UserMutations for UserMutation {
         };
         
         Ok::<AuthorizedUser, SignInError>(user)
+    }
+
+    async fn refresh_access_token(&self, ctx: &Context<'_>, refresh_token: String) -> Result<AuthorizedUser, AuthError> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        let user = services::authentication::authenticator::get_user(db, &Token(refresh_token)).await?;
+        
+        Ok::<AuthorizedUser, AuthError>(AuthorizedUser {
+            token: generate_token(&user),
+            refresh_token: generate_refresh_token(&user),
+        })
     }
 }

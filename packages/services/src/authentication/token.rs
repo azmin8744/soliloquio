@@ -22,23 +22,42 @@ impl fmt::Display for AuthError {
     }
 }
 
+trait TokenTrait {
+    fn verify(&self, token: String) -> Result<TokenData<Claims>, Error> {
+        decode::<Claims>(&token, &DecodingKey::from_secret(secret().as_ref()), &Validation::default())
+    }
+}
+impl TokenTrait for Token {}
 impl Token {
     pub fn get_user_id(&self) -> Result<Uuid, AuthError> {
-        let token_data = self.verify_token()?;
+        // If token string begins from "Bearer ", then remove it
+        // and get the token
+        let token = match self.0.starts_with("Bearer ") {
+            true => self.0.split_whitespace().nth(1).unwrap(),
+            false => self.0.as_str(),
+        };
+        let token_data = self.verify(token.to_string())?;
         let user_id = token_data.claims.sub.clone();
         Ok(user_id.parse::<Uuid>().unwrap())
-    }
-
-    pub fn verify_token(&self) -> Result<TokenData<Claims>, Error> {
-        // a token begins with "Bearer " and then the token
-        let token = self.0.split_whitespace().nth(1).unwrap();
-
-        decode::<Claims>(token, &DecodingKey::from_secret(secret().as_ref()), & Validation::default())
     }
 }
 
 pub fn generate_token(user: &User) -> String {
     let expiration = Utc::now().checked_add_signed(Duration::seconds(expiration())).unwrap();
+    let host_name = env::var("HOST_NAME").unwrap();
+    let claims = Claims {
+        iss: host_name,
+        sub: user.id.clone().to_string(),
+        exp: expiration.timestamp(),
+        iat: Utc::now().timestamp(),
+        jti: Uuid::new_v4().to_string(),
+    };
+
+    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret().as_ref())).unwrap()
+}
+
+pub fn generate_refresh_token(user: &User) -> String {
+    let expiration = Utc::now().checked_add_signed(Duration::days(refresh_token_expiration())).unwrap();
     let host_name = env::var("HOST_NAME").unwrap();
     let claims = Claims {
         iss: host_name,
@@ -57,4 +76,8 @@ fn secret() -> String {
 
 fn expiration() -> i64 {
     env::var("TOKEN_EXPIRATION_SECONDS").unwrap().parse::<i64>().unwrap()
+}
+
+fn refresh_token_expiration() -> i64 {
+    env::var("REFRESH_TOKEN_EXPIRATION_DAYS").unwrap().parse::<i64>().unwrap()
 }

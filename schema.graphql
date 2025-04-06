@@ -25,6 +25,7 @@ type Mutations {
 	updatePost(post: UpdatePostInput!): PostMutationResult!
 	signUp(email: String!, password: String!): AuthorizedUser!
 	signIn(email: String!, password: String!): AuthorizedUser!
+	refreshAccessToken(refreshToken: String!): AuthorizedUser!
 }
 
 """
