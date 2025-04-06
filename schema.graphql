@@ -1,3 +1,8 @@
+input AddPostInput {
+	title: String!
+	body: String!
+}
+
 type AuthError {
 	message: String!
 }
@@ -16,7 +21,8 @@ type DbErr {
 
 
 type Mutations {
-	addPost(title: String!, body: String!): PostMutationResult!
+	addPost(newPost: AddPostInput!): PostMutationResult!
+	updatePost(post: UpdatePostInput!): PostMutationResult!
 	signUp(email: String!, password: String!): AuthorizedUser!
 	signIn(email: String!, password: String!): AuthorizedUser!
 }
@@ -62,6 +68,12 @@ entities without requiring a central allocating authority.
 * [RFC4122: A Universally Unique IDentifier (UUID) URN Namespace](http://tools.ietf.org/html/rfc4122)
 """
 scalar UUID
+
+input UpdatePostInput {
+	id: UUID!
+	title: String!
+	body: String!
+}
 
 directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
 directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT

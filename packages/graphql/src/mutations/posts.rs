@@ -1,4 +1,4 @@
-use async_graphql::{Context, Object, SimpleObject, Union, Result};
+use async_graphql::{Context, InputObject, Object, Result, SimpleObject, Union};
 use sea_orm::*;
 use std::fmt;
 use models::{prelude::*, *};
@@ -45,18 +45,32 @@ pub enum PostMutationResult {
     AuthError(AuthError),
 }
 
+#[derive(InputObject)]
+struct AddPostInput {
+    title: String,
+    body: String,
+}
+
+#[derive(InputObject)]
+struct UpdatePostInput {
+    id: Uuid,
+    title: String,
+    body: String,
+}
+
 #[derive(Default)]
 pub struct PostMutation;
 
 trait PostMutations {
-    async fn add_post(&self, ctx: &Context<'_>, title: String, body: String) -> Result<PostMutationResult>;
+    async fn add_post(&self, ctx: &Context<'_>, new_post: AddPostInput) -> Result<PostMutationResult>;
+    async fn update_post(&self, ctx: &Context<'_>, post: UpdatePostInput) -> Result<PostMutationResult>;
 }
 
 impl RequiresAuth for PostMutation {}
 
 #[Object]
 impl PostMutations for PostMutation {
-    async fn add_post(&self, ctx: &Context<'_>, title: String, body: String) -> Result<PostMutationResult> {
+    async fn add_post(&self, ctx: &Context<'_>, new_post: AddPostInput) -> Result<PostMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
         let user = match self.require_authenticate_as_user(ctx).await {
@@ -70,8 +84,8 @@ impl PostMutations for PostMutation {
 
         let post = posts::ActiveModel {
             id: ActiveValue::set(Uuid::new_v4()),
-            title: ActiveValue::set(title),
-            body: ActiveValue::set(body),
+            title: ActiveValue::set(new_post.title),
+            body: ActiveValue::set(new_post.body),
             user_id: ActiveValue::set(user.id),
             ..Default::default()
         };
@@ -107,5 +121,53 @@ impl PostMutations for PostMutation {
             created_at: p.created_at,
             updated_at: p.updated_at,
         }))
+    }
+
+    async fn update_post(&self, ctx: &Context<'_>, post: UpdatePostInput) -> Result<PostMutationResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        let _user = match self.require_authenticate_as_user(ctx).await {
+            Ok(user) => user,
+            Err(e) => {
+                return Ok(PostMutationResult::AuthError(AuthError {
+                    message: e.to_string(),
+                }));
+            }
+        };
+
+        let mut post_to_update = match Posts::find_by_id(post.id).one(db).await {
+            Ok(Some(p)) => p.into_active_model(),
+            Ok(None) => {
+                return Ok(PostMutationResult::DbError(DbErr {
+                    message: "Post not found".to_string(),
+                }));
+            }
+            Err(e) => {
+                return Ok(PostMutationResult::DbError(DbErr {
+                    message: e.to_string(),
+                }));
+            }
+        };
+
+        post_to_update.title = ActiveValue::set(post.title);
+        post_to_update.body = ActiveValue::set(post.body);
+
+        let _res = match Posts::update(post_to_update).exec(db).await {
+            Ok(p) => {
+                return Ok(PostMutationResult::PostType(PostType {
+                    id: p.id,
+                    title: p.title,
+                    body: p.body,
+                    published_at: p.published_at,
+                    created_at: p.created_at,
+                    updated_at: p.updated_at,
+                }))
+            },
+            Err(e) => {
+                return Ok(PostMutationResult::DbError(DbErr {
+                    message: e.to_string(),
+                }));
+            }
+        };
     }
 }
