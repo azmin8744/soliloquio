@@ -3,7 +3,7 @@ use sea_orm::*;
 use std::fmt;
 use models::{prelude::*, *};
 use sea_orm::entity::prelude::Uuid;
-use crate::types::post::Post as PostType;
+use crate::types::post::{Post as PostType, DeletedPost};
 use crate::utilities::requires_auth::RequiresAuth;
 
 #[derive(SimpleObject, Debug)]
@@ -40,7 +40,8 @@ impl fmt::Display for AuthError {
 
 #[derive(Union)]
 pub enum PostMutationResult {
-    PostType(PostType),
+    ChangedPost(PostType),
+    DeletedPost(DeletedPost),
     DbError(DbErr),
     AuthError(AuthError),
 }
@@ -58,12 +59,18 @@ struct UpdatePostInput {
     body: String,
 }
 
+#[derive(InputObject)]
+struct DeletePostInput {
+    id: Uuid,
+}
+
 #[derive(Default)]
 pub struct PostMutation;
 
 trait PostMutations {
     async fn add_post(&self, ctx: &Context<'_>, new_post: AddPostInput) -> Result<PostMutationResult>;
     async fn update_post(&self, ctx: &Context<'_>, post: UpdatePostInput) -> Result<PostMutationResult>;
+    async fn delete_post(&self, ctx: &Context<'_>, post: DeletePostInput) -> Result<PostMutationResult>;
 }
 
 impl RequiresAuth for PostMutation {}
@@ -113,7 +120,7 @@ impl PostMutations for PostMutation {
             }
         };
 
-        Ok(PostMutationResult::PostType(PostType {
+        Ok(PostMutationResult::ChangedPost(PostType {
             id: p.id,
             title: p.title,
             body: p.body,
@@ -154,7 +161,7 @@ impl PostMutations for PostMutation {
 
         let _res = match Posts::update(post_to_update).exec(db).await {
             Ok(p) => {
-                return Ok(PostMutationResult::PostType(PostType {
+                return Ok(PostMutationResult::ChangedPost(PostType {
                     id: p.id,
                     title: p.title,
                     body: p.body,
@@ -169,5 +176,39 @@ impl PostMutations for PostMutation {
                 }));
             }
         };
+    }
+
+    async fn delete_post(&self, ctx: &Context<'_>, post: DeletePostInput) -> Result<PostMutationResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        let _user = match self.require_authenticate_as_user(ctx).await {
+            Ok(user) => user,
+            Err(e) => {
+                return Ok(PostMutationResult::AuthError(AuthError {
+                    message: e.to_string(),
+                }));
+            }
+        };
+
+        let post_to_delete = match Posts::find_by_id(post.id).one(db).await {
+            Ok(Some(p)) => p.into_active_model(),
+            Ok(None) => {
+                return Ok(PostMutationResult::DbError(DbErr {
+                    message: "Post not found".to_string(),
+                }));
+            }
+            Err(e) => {
+                return Ok(PostMutationResult::DbError(DbErr {
+                    message: e.to_string(),
+                }));
+            }
+        };
+
+        match Posts::delete(post_to_delete.clone()).exec(db).await {
+            Ok(_) => Ok(PostMutationResult::DeletedPost(DeletedPost { id: post_to_delete.id.unwrap() })),
+            Err(e) => Ok(PostMutationResult::DbError(DbErr {
+                message: e.to_string(),
+            })),
+        }
     }
 }

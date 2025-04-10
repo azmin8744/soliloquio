@@ -17,12 +17,21 @@ type DbErr {
 	message: String!
 }
 
+input DeletePostInput {
+	id: UUID!
+}
+
+type DeletedPost {
+	id: UUID!
+}
+
 
 
 
 type Mutations {
 	addPost(newPost: AddPostInput!): PostMutationResult!
 	updatePost(post: UpdatePostInput!): PostMutationResult!
+	deletePost(post: DeletePostInput!): PostMutationResult!
 	signUp(email: String!, password: String!): AuthorizedUser!
 	signIn(email: String!, password: String!): AuthorizedUser!
 	refreshAccessToken(refreshToken: String!): AuthorizedUser!
@@ -46,7 +55,7 @@ type Post {
 	updatedAt: NaiveDateTime
 }
 
-union PostMutationResult = Post | DbErr | AuthError
+union PostMutationResult = Post | DeletedPost | DbErr | AuthError
 
 type Queries {
 	posts: [Post!]!

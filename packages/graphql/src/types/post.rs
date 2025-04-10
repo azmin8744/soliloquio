@@ -11,3 +11,8 @@ pub struct Post {
     pub created_at:  Option<NaiveDateTime>,
     pub updated_at:  Option<NaiveDateTime>,
 }
+
+#[derive(SimpleObject)]
+pub struct DeletedPost {
+    pub id: Uuid,
+}
