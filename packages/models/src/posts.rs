@@ -12,7 +12,8 @@ pub struct Model {
     #[sea_orm(column_type = "Text")]
     pub body: String,
     pub user_id: Uuid,
-    pub published_at: Option<DateTime>,
+    pub is_published: bool,
+    pub first_published_at: Option<DateTime>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }

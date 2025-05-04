@@ -50,6 +50,7 @@ pub enum PostMutationResult {
 struct AddPostInput {
     title: String,
     body: String,
+    is_published: Option<bool>,
 }
 
 #[derive(InputObject)]
@@ -57,6 +58,7 @@ struct UpdatePostInput {
     id: Uuid,
     title: String,
     body: String,
+    is_published: Option<bool>,
 }
 
 #[derive(InputObject)]
@@ -89,11 +91,20 @@ impl PostMutations for PostMutation {
             }
         };
 
+        let is_published = new_post.is_published.unwrap_or(false);
+        let first_published_at = if is_published { 
+            Some(chrono::Utc::now().naive_utc())
+        } else {
+            None
+        };
+        
         let post = posts::ActiveModel {
             id: ActiveValue::set(Uuid::new_v4()),
             title: ActiveValue::set(new_post.title),
             body: ActiveValue::set(new_post.body),
             user_id: ActiveValue::set(user.id),
+            is_published: ActiveValue::set(is_published),
+            first_published_at: ActiveValue::set(first_published_at),
             ..Default::default()
         };
 
@@ -124,7 +135,8 @@ impl PostMutations for PostMutation {
             id: p.id,
             title: p.title,
             body: p.body,
-            published_at: p.published_at,
+            is_published: p.is_published,
+            first_published_at: p.first_published_at,
             created_at: p.created_at,
             updated_at: p.updated_at,
         }))
@@ -158,6 +170,19 @@ impl PostMutations for PostMutation {
 
         post_to_update.title = ActiveValue::set(post.title);
         post_to_update.body = ActiveValue::set(post.body);
+        
+        // Handle publication status change if provided
+        if let Some(is_published) = post.is_published {
+            post_to_update.is_published = ActiveValue::set(is_published);
+            
+            // Set first_published_at if being published for the first time
+            if is_published {
+                let post_model = Posts::find_by_id(post.id).one(db).await.unwrap().unwrap();
+                if post_model.first_published_at.is_none() {
+                    post_to_update.first_published_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
+                }
+            }
+        }
 
         let _res = match Posts::update(post_to_update).exec(db).await {
             Ok(p) => {
@@ -165,7 +190,8 @@ impl PostMutations for PostMutation {
                     id: p.id,
                     title: p.title,
                     body: p.body,
-                    published_at: p.published_at,
+                    is_published: p.is_published,
+                    first_published_at: p.first_published_at,
                     created_at: p.created_at,
                     updated_at: p.updated_at,
                 }))

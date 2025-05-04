@@ -3,7 +3,8 @@ create table posts (
     title text not null,
     body text not null,
     user_id uuid not null,
-    published_at timestamp,
+    is_published boolean default false not null,
+    first_published_at timestamp,
     created_at timestamp default current_timestamp,
     updated_at timestamp default current_timestamp
 );

@@ -1,6 +1,7 @@
 input AddPostInput {
 	title: String!
 	body: String!
+	isPublished: Boolean
 }
 
 type AuthError {
@@ -50,7 +51,8 @@ type Post {
 	id: UUID!
 	title: String!
 	body: String!
-	publishedAt: NaiveDateTime
+	isPublished: Boolean!
+	firstPublishedAt: NaiveDateTime
 	createdAt: NaiveDateTime
 	updatedAt: NaiveDateTime
 }
@@ -83,6 +85,7 @@ input UpdatePostInput {
 	id: UUID!
 	title: String!
 	body: String!
+	isPublished: Boolean
 }
 
 directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT

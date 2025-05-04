@@ -23,7 +23,8 @@ impl PostQueries for Queries {
                 id: post.id,
                 title: post.title.clone(),
                 body: post.body.clone(),
-                published_at: post.published_at.clone(),
+                is_published: post.is_published,
+                first_published_at: post.first_published_at,
                 created_at: post.created_at,
                 updated_at: post.updated_at,
              };
@@ -41,7 +42,8 @@ impl PostQueries for Queries {
             id: post.id,
             title: post.title.clone(),
             body: post.body.clone(),
-            published_at: post.published_at.clone(),
+            is_published: post.is_published,
+            first_published_at: post.first_published_at,
             created_at: post.created_at,
             updated_at: post.updated_at,
          };

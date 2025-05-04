@@ -7,9 +7,10 @@ pub struct Post {
     pub id: Uuid,
     pub title: String,
     pub body: String,
-    pub published_at: Option<NaiveDateTime>,
-    pub created_at:  Option<NaiveDateTime>,
-    pub updated_at:  Option<NaiveDateTime>,
+    pub is_published: bool,
+    pub first_published_at: Option<NaiveDateTime>,
+    pub created_at: Option<NaiveDateTime>,
+    pub updated_at: Option<NaiveDateTime>,
 }
 
 #[derive(SimpleObject)]
