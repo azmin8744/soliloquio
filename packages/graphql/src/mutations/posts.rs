@@ -170,6 +170,7 @@ impl PostMutations for PostMutation {
 
         post_to_update.title = ActiveValue::set(post.title);
         post_to_update.body = ActiveValue::set(post.body);
+        post_to_update.updated_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
         
         // Handle publication status change if provided
         if let Some(is_published) = post.is_published {
