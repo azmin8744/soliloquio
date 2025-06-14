@@ -1,4 +1,4 @@
-use async_graphql::{Context, Object};
+use async_graphql::{Context, InputObject, Object};
 use std::fmt;
 use sea_orm::*;
 use models::{prelude::*, *};
@@ -63,30 +63,42 @@ impl fmt::Display for AuthError {
     }
 }
 
+#[derive(InputObject)]
+struct SignUpInput {
+    email: String,
+    password: String,
+}
+
+#[derive(InputObject)]
+struct SignInInput {
+    email: String,
+    password: String,
+}
+
 #[derive(Default)]
 pub struct UserMutation;
 
 trait UserMutations {
-    async fn sign_up(&self, ctx: &Context<'_>, email: String, password: String) -> Result<AuthorizedUser, SignInError>;
-    async fn sign_in(&self, ctx: &Context<'_>, email: String, password: String) -> Result<AuthorizedUser, SignInError>;
+    async fn sign_up(&self, ctx: &Context<'_>, input: SignUpInput) -> Result<AuthorizedUser, SignInError>;
+    async fn sign_in(&self, ctx: &Context<'_>, input: SignInInput) -> Result<AuthorizedUser, SignInError>;
     async fn refresh_access_token(&self, ctx: &Context<'_>, refresh_token: String) -> Result<AuthorizedUser, AuthError>;
 }
 
 #[Object]
 impl UserMutations for UserMutation {
-    async fn sign_up(&self, ctx: &Context<'_>, email: String, password: String) -> Result<AuthorizedUser, SignInError> {
+    async fn sign_up(&self, ctx: &Context<'_>, input: SignUpInput) -> Result<AuthorizedUser, SignInError> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
         // ソルトをランダムに生成する
         let salt = SaltString::generate(&mut OsRng);
         // パスワードをscryptでハッシュ化する
         let argon2 = Argon2::default();
-        let password_hash = argon2.hash_password(&password.into_bytes(), &salt)?.to_string();
+        let password_hash = argon2.hash_password(&input.password.into_bytes(), &salt)?.to_string();
         let user_id = Uuid::new_v4();
         let refresh_token = generate_refresh_token(user_id.to_string());
         // User モデルを作ってinsertする
         let user = users::ActiveModel {
             id: ActiveValue::set(user_id),
-            email: ActiveValue::set(email),
+            email: ActiveValue::set(input.email),
             password: ActiveValue::set(password_hash),
             refresh_token: ActiveValue::set(Some(refresh_token)),
             ..Default::default()
@@ -100,17 +112,17 @@ impl UserMutations for UserMutation {
         })
     }
 
-    async fn sign_in(&self, ctx: &Context<'_>, email: String, password: String) -> Result<AuthorizedUser, SignInError> {
+    async fn sign_in(&self, ctx: &Context<'_>, input: SignInInput) -> Result<AuthorizedUser, SignInError> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
         let user = Users::find()
-        .filter(users::Column::Email.contains(email))
+        .filter(users::Column::Email.contains(input.email))
         .one(db)
         .await?
         .ok_or(SignInError { message: "User not found".to_string() })?;
 
         let parsed_hash = PasswordHash::new(&user.password)?;
 
-        Argon2::default().verify_password(&password.into_bytes(), &parsed_hash).or(
+        Argon2::default().verify_password(&input.password.into_bytes(), &parsed_hash).or(
             Err(SignInError { message: "Password is incorrect".to_string() })
         )?;
 
