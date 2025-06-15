@@ -1,7 +1,7 @@
 create table posts (
     id uuid primary key,
     title text not null,
-    body text not null,
+    markdown_content text,
     user_id uuid not null,
     is_published boolean default false not null,
     first_published_at timestamp,

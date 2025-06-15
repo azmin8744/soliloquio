@@ -1,6 +1,6 @@
 input AddPostInput {
 	title: String!
-	body: String!
+	content: String!
 	isPublished: Boolean
 }
 
@@ -50,11 +50,18 @@ scalar NaiveDateTime
 type Post {
 	id: UUID!
 	title: String!
-	body: String!
 	isPublished: Boolean!
 	firstPublishedAt: NaiveDateTime
 	createdAt: NaiveDateTime
 	updatedAt: NaiveDateTime
+	"""
+	Returns the original markdown content for editing
+	"""
+	markdownContent: String!
+	"""
+	Returns the rendered HTML content for display
+	"""
+	content: String!
 }
 
 union PostMutationResult = Post | DeletedPost | DbErr | AuthError
@@ -94,7 +101,7 @@ scalar UUID
 input UpdatePostInput {
 	id: UUID!
 	title: String!
-	body: String!
+	content: String!
 	isPublished: Boolean
 }
 

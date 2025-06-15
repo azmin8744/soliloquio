@@ -9,13 +9,13 @@ pub struct Model {
     pub id: Uuid,
     #[sea_orm(column_type = "Text")]
     pub title: String,
-    #[sea_orm(column_type = "Text")]
-    pub body: String,
     pub user_id: Uuid,
     pub is_published: bool,
     pub first_published_at: Option<DateTime>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub markdown_content: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

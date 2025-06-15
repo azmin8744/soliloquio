@@ -49,7 +49,7 @@ pub enum PostMutationResult {
 #[derive(InputObject)]
 struct AddPostInput {
     title: String,
-    body: String,
+    content: String,  // This will be the markdown content
     is_published: Option<bool>,
 }
 
@@ -57,7 +57,7 @@ struct AddPostInput {
 struct UpdatePostInput {
     id: Uuid,
     title: String,
-    body: String,
+    content: String,  // This will be the markdown content
     is_published: Option<bool>,
 }
 
@@ -101,7 +101,7 @@ impl PostMutations for PostMutation {
         let post = posts::ActiveModel {
             id: ActiveValue::set(Uuid::new_v4()),
             title: ActiveValue::set(new_post.title),
-            body: ActiveValue::set(new_post.body),
+            markdown_content: ActiveValue::set(Some(new_post.content)),
             user_id: ActiveValue::set(user.id),
             is_published: ActiveValue::set(is_published),
             first_published_at: ActiveValue::set(first_published_at),
@@ -133,8 +133,8 @@ impl PostMutations for PostMutation {
 
         Ok(PostMutationResult::ChangedPost(PostType {
             id: p.id,
-            title: p.title,
-            body: p.body,
+            title: p.title.clone(),
+            markdown_content: p.markdown_content.unwrap_or_default(),
             is_published: p.is_published,
             first_published_at: p.first_published_at,
             created_at: p.created_at,
@@ -169,8 +169,13 @@ impl PostMutations for PostMutation {
         };
 
         post_to_update.title = ActiveValue::set(post.title);
-        post_to_update.body = ActiveValue::set(post.body);
+        post_to_update.markdown_content = ActiveValue::set(Some(post.content));
         post_to_update.updated_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
+        
+        // Invalidate cache for this post
+        if let Ok(cache) = ctx.data::<crate::utilities::MarkdownCache>() {
+            cache.invalidate(&post.id);
+        }
         
         // Handle publication status change if provided
         if let Some(is_published) = post.is_published {
@@ -189,8 +194,8 @@ impl PostMutations for PostMutation {
             Ok(p) => {
                 return Ok(PostMutationResult::ChangedPost(PostType {
                     id: p.id,
-                    title: p.title,
-                    body: p.body,
+                    title: p.title.clone(),
+                    markdown_content: p.markdown_content.unwrap_or_default(),
                     is_published: p.is_published,
                     first_published_at: p.first_published_at,
                     created_at: p.created_at,

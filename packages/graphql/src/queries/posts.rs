@@ -22,7 +22,7 @@ impl PostQueries for Queries {
             let p = PostType { 
                 id: post.id,
                 title: post.title.clone(),
-                body: post.body.clone(),
+                markdown_content: post.markdown_content.clone().unwrap_or_default(),
                 is_published: post.is_published,
                 first_published_at: post.first_published_at,
                 created_at: post.created_at,
@@ -37,16 +37,19 @@ impl PostQueries for Queries {
         let db = ctx.data::<DatabaseConnection>().unwrap();
         let res = Posts::find_by_id(id).one(db).await;
         assert_eq!(res.is_ok(), true);
-        let post = res.unwrap().unwrap();
-        let p = PostType { 
-            id: post.id,
-            title: post.title.clone(),
-            body: post.body.clone(),
-            is_published: post.is_published,
-            first_published_at: post.first_published_at,
-            created_at: post.created_at,
-            updated_at: post.updated_at,
-         };
-        Ok::<Option<PostType>, DbErr>(Some(p))
+        if let Some(post) = res.unwrap() {
+            let p = PostType { 
+                id: post.id,
+                title: post.title.clone(),
+                markdown_content: post.markdown_content.clone().unwrap_or_default(),
+                is_published: post.is_published,
+                first_published_at: post.first_published_at,
+                created_at: post.created_at,
+                updated_at: post.updated_at,
+             };
+            Ok::<Option<PostType>, DbErr>(Some(p))
+        } else {
+            Ok::<Option<PostType>, DbErr>(None)
+        }
     }
 }

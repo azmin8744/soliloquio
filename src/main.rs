@@ -8,6 +8,7 @@ use setup::set_up_db;
 use graphql::queries::Queries as QueryRoot;
 use graphql::mutations::Mutations as MutationRoot;
 use graphql::subscriptions::{Subscriptions as SubscriptionRoot, on_connection_init};
+use graphql::utilities::MarkdownCache;
 use services::authentication::Token;
 
 type SchemaType = Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
@@ -58,8 +59,11 @@ async fn main() -> std::io::Result<()> {
         Err(err) => panic!("{}", err),
     };
 
+    let markdown_cache = MarkdownCache::new();
+
     let schema = Schema::build(QueryRoot, MutationRoot::default(), SubscriptionRoot)
     .data(db) // Add the database connection to the GraphQL global context
+    .data(markdown_cache) // Add the markdown cache to the GraphQL global context
     .finish();
 
     println!("GraphiQL IDE: http://localhost:8000");
