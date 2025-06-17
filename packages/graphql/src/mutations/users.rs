@@ -1,4 +1,4 @@
-use async_graphql::{Context, InputObject, Object};
+use async_graphql::{Context, InputObject, Object, Result, SimpleObject, Union};
 use std::fmt;
 use sea_orm::*;
 use models::{prelude::*, *};
@@ -15,9 +15,59 @@ use services::authentication::token::{Token, generate_token};
 use services::authentication::refresh_token::{
     create_refresh_token, validate_refresh_token, revoke_refresh_token, revoke_all_refresh_tokens, cleanup_expired_tokens
 };
+use services::validation::ValidationError;
 
+// Error Types
+#[derive(SimpleObject, Debug)]
+pub struct ValidationErrorType {
+    message: String,
+}
+
+#[derive(SimpleObject, Debug)]
+pub struct DbErr {
+    message: String,
+}
+
+impl From<sea_orm::error::DbErr> for DbErr {
+    fn from(e: sea_orm::error::DbErr) -> Self {
+        DbErr { message: e.to_string() }
+    }
+}
+
+#[derive(SimpleObject, Debug)]
+pub struct AuthError {
+    message: String,
+}
+
+impl From<services::AuthenticationError> for AuthError {
+    fn from(e: services::AuthenticationError) -> Self {
+        AuthError { message: e.to_string() }
+    }
+}
+
+impl From<sea_orm::error::DbErr> for AuthError {
+    fn from(e: sea_orm::error::DbErr) -> Self {
+        AuthError { message: e.to_string() }
+    }
+}
+
+impl fmt::Display for AuthError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.message.as_str())
+    }
+}
+
+#[derive(Union)]
+pub enum UserMutationResult {
+    AuthorizedUser(AuthorizedUser),
+    ValidationError(ValidationErrorType),
+    DbError(DbErr),
+    AuthError(AuthError),
+}
+
+// Retain the SignInError struct for backward compatibility and conversions
 #[derive(Debug)]
-struct SignInError{
+struct SignInError {
     pub message: String,
 }
 
@@ -45,24 +95,9 @@ impl From<argon2::password_hash::Error> for SignInError {
     }
 }
 
-pub struct AuthError {
-    message: String,
-}
-impl From<services::AuthenticationError> for AuthError {
-    fn from(e: services::AuthenticationError) -> Self {
-        AuthError { message: e.to_string() }
-    }
-}
-
-impl From<sea_orm::error::DbErr> for AuthError {
-    fn from(e: sea_orm::error::DbErr) -> Self {
-        AuthError { message: e.to_string() }
-    }
-}
-
-impl fmt::Display for AuthError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.message.as_str())
+impl From<ValidationError> for SignInError {
+    fn from(e: ValidationError) -> Self {
+        SignInError { message: e.to_string() }
     }
 }
 
@@ -82,89 +117,157 @@ struct SignInInput {
 pub struct UserMutation;
 
 trait UserMutations {
-    async fn sign_up(&self, ctx: &Context<'_>, input: SignUpInput) -> Result<AuthorizedUser, SignInError>;
-    async fn sign_in(&self, ctx: &Context<'_>, input: SignInInput) -> Result<AuthorizedUser, SignInError>;
-    async fn refresh_access_token(&self, ctx: &Context<'_>, refresh_token: String) -> Result<AuthorizedUser, AuthError>;
+    async fn sign_up(&self, ctx: &Context<'_>, input: SignUpInput) -> Result<UserMutationResult>;
+    async fn sign_in(&self, ctx: &Context<'_>, input: SignInInput) -> Result<UserMutationResult>;
+    async fn refresh_access_token(&self, ctx: &Context<'_>, refresh_token: String) -> Result<UserMutationResult>;
     async fn logout(&self, ctx: &Context<'_>, refresh_token: String) -> Result<bool, AuthError>;
     async fn logout_all_devices(&self, ctx: &Context<'_>, access_token: String) -> Result<bool, AuthError>;
 }
 
 #[Object]
 impl UserMutations for UserMutation {
-    async fn sign_up(&self, ctx: &Context<'_>, input: SignUpInput) -> Result<AuthorizedUser, SignInError> {
+    async fn sign_up(&self, ctx: &Context<'_>, input: SignUpInput) -> Result<UserMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
-        // ソルトをランダムに生成する
-        let salt = SaltString::generate(&mut OsRng);
-        // パスワードをscryptでハッシュ化する
-        let argon2 = Argon2::default();
-        let password_hash = argon2.hash_password(&input.password.into_bytes(), &salt)?.to_string();
-        let user_id = Uuid::new_v4();
         
-        // User モデルを作ってinsertする
-        let user = users::ActiveModel {
-            id: ActiveValue::set(user_id),
-            email: ActiveValue::set(input.email),
-            password: ActiveValue::set(password_hash),
+        // Create user model for validation
+        let mut user = users::ActiveModel {
+            id: ActiveValue::set(Uuid::new_v4()),
+            email: ActiveValue::set(input.email.clone()),
+            password: ActiveValue::set(input.password.clone()),
             ..Default::default()
         };
-        let res = user.insert(db).await?;
+        
+        // Validate the user model before proceeding
+        use services::validation::ActiveModelValidator;
+        if let Err(validation_error) = user.validate() {
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
+                message: validation_error.to_string() 
+            }));
+        }
+        
+        // Generate salt and hash the password
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        let password_hash = match argon2.hash_password(&input.password.into_bytes(), &salt) {
+            Ok(hash) => hash.to_string(),
+            Err(_) => return Ok(UserMutationResult::AuthError(AuthError {
+                message: "Failed to hash password".to_string()
+            })),
+        };
+        
+        user.password = ActiveValue::set(password_hash.clone());
+ 
+        let res = match user.insert(db).await {
+            Ok(user) => user,
+            Err(e) => return Ok(UserMutationResult::DbError(DbErr {
+                message: e.to_string()
+            })),
+        };
 
         // Create refresh token and store in separate table
-        let refresh_token = create_refresh_token(db, res.id, None).await
-            .map_err(|e| SignInError { message: e.to_string() })?;
+        let refresh_token = match create_refresh_token(db, res.id, None).await {
+            Ok(token) => token,
+            Err(e) => return Ok(UserMutationResult::AuthError(AuthError {
+                message: e.to_string()
+            })),
+        };
 
         // Opportunistic cleanup of expired tokens
         let _ = cleanup_expired_tokens(db).await;
 
-        // アクセストークンを生成して、AuthorizedUser を返す
-        Ok::<AuthorizedUser, SignInError>(AuthorizedUser {
+        // Generate access token and return AuthorizedUser
+        Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
             token: generate_token(&res),
             refresh_token,
-        })
+        }))
     }
 
-    async fn sign_in(&self, ctx: &Context<'_>, input: SignInInput) -> Result<AuthorizedUser, SignInError> {
+    async fn sign_in(&self, ctx: &Context<'_>, input: SignInInput) -> Result<UserMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
-        let user = Users::find()
-        .filter(users::Column::Email.contains(input.email))
-        .one(db)
-        .await?
-        .ok_or(SignInError { message: "User not found".to_string() })?;
+        
+        // Basic input validation
+        if input.email.trim().is_empty() {
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
+                message: "Email cannot be empty".to_string() 
+            }));
+        }
+        
+        if input.password.trim().is_empty() {
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
+                message: "Password cannot be empty".to_string() 
+            }));
+        }
+        
+        // Find user
+        let user = match Users::find()
+            .filter(users::Column::Email.contains(input.email))
+            .one(db)
+            .await 
+        {
+            Ok(Some(user)) => user,
+            Ok(None) => return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
+                message: "Email or password incorrect".to_string() 
+            })),
+            Err(e) => return Ok(UserMutationResult::DbError(DbErr {
+                message: e.to_string()
+            })),
+        };
 
-        let parsed_hash = PasswordHash::new(&user.password)?;
+        // Verify password
+        let parsed_hash = match PasswordHash::new(&user.password) {
+            Ok(hash) => hash,
+            Err(_) => return Ok(UserMutationResult::AuthError(AuthError { 
+                message: "Invalid password hash in database".to_string() 
+            })),
+        };
 
-        Argon2::default().verify_password(&input.password.into_bytes(), &parsed_hash).or(
-            Err(SignInError { message: "Password is incorrect".to_string() })
-        )?;
+        if Argon2::default().verify_password(&input.password.into_bytes(), &parsed_hash).is_err() {
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
+                message: "Email or password incorrect".to_string() 
+            }));
+        }
 
         // Create new refresh token for this session
-        let refresh_token = create_refresh_token(db, user.id, None).await
-            .map_err(|e| SignInError { message: e.to_string() })?;
+        let refresh_token = match create_refresh_token(db, user.id, None).await {
+            Ok(token) => token,
+            Err(e) => return Ok(UserMutationResult::AuthError(AuthError {
+                message: e.to_string()
+            })),
+        };
 
         // Opportunistic cleanup of expired tokens
         let _ = cleanup_expired_tokens(db).await;
         
-        Ok::<AuthorizedUser, SignInError>(AuthorizedUser {
+        Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
             token: generate_token(&user),
             refresh_token,
-        })
+        }))
     }
 
-    async fn refresh_access_token(&self, ctx: &Context<'_>, refresh_token: String) -> Result<AuthorizedUser, AuthError> {
+    async fn refresh_access_token(&self, ctx: &Context<'_>, refresh_token: String) -> Result<UserMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
         // Validate the refresh token and get the refresh token record
-        let refresh_token_record = validate_refresh_token(db, &refresh_token).await
-            .map_err(|e| AuthError { message: e.message })?;
+        let refresh_token_record = match validate_refresh_token(db, &refresh_token).await {
+            Ok(record) => record,
+            Err(e) => return Ok(UserMutationResult::AuthError(AuthError {
+                message: e.message
+            })),
+        };
 
         // Get the user associated with this refresh token
-        let user = services::authentication::authenticator::get_user(db, &Token::new(refresh_token.clone())).await?;
+        let user = match services::authentication::authenticator::get_user(db, &Token::new(refresh_token.clone())).await {
+            Ok(user) => user,
+            Err(e) => return Ok(UserMutationResult::AuthError(AuthError {
+                message: e.to_string()
+            })),
+        };
         
         // Ensure the token belongs to the correct user (extra security check)
         if refresh_token_record.user_id != user.id {
-            return Err::<AuthorizedUser, AuthError>(AuthError {
+            return Ok(UserMutationResult::AuthError(AuthError {
                 message: "Refresh token does not belong to the authenticated user".to_string(),
-            });
+            }));
         }
 
         // Generate a new access token
@@ -173,10 +276,10 @@ impl UserMutations for UserMutation {
         // Opportunistic cleanup of expired tokens
         let _ = cleanup_expired_tokens(db).await;
 
-        Ok::<AuthorizedUser, AuthError>(AuthorizedUser {
+        Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
             token: new_access_token,
             refresh_token: refresh_token, // Return the same refresh token
-        })
+        }))
     }
 
     async fn logout(&self, ctx: &Context<'_>, refresh_token: String) -> Result<bool, AuthError> {
