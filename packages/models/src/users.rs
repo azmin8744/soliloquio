@@ -11,8 +11,6 @@ pub struct Model {
     pub email: String,
     #[sea_orm(column_type = "Text")]
     pub password: String,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub refresh_token: Option<String>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }
@@ -21,11 +19,19 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::posts::Entity")]
     Posts,
+    #[sea_orm(has_many = "super::refresh_tokens::Entity")]
+    RefreshTokens,
 }
 
 impl Related<super::posts::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Posts.def()
+    }
+}
+
+impl Related<super::refresh_tokens::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::RefreshTokens.def()
     }
 }
 

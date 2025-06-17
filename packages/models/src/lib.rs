@@ -3,4 +3,5 @@
 pub mod prelude;
 
 pub mod posts;
+pub mod refresh_tokens;
 pub mod users;

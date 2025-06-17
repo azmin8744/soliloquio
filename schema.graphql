@@ -36,6 +36,8 @@ type Mutations {
 	signUp(input: SignUpInput!): AuthorizedUser!
 	signIn(input: SignInInput!): AuthorizedUser!
 	refreshAccessToken(refreshToken: String!): AuthorizedUser!
+	logout(refreshToken: String!): Boolean!
+	logoutAllDevices(accessToken: String!): Boolean!
 }
 
 """

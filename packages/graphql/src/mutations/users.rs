@@ -11,7 +11,10 @@ use argon2::{
     Argon2
 };
 use crate::types::authorized_user::AuthorizedUser;
-use services::authentication::token::{Token, generate_token, generate_refresh_token};
+use services::authentication::token::{Token, generate_token};
+use services::authentication::refresh_token::{
+    create_refresh_token, validate_refresh_token, revoke_refresh_token, revoke_all_refresh_tokens, cleanup_expired_tokens
+};
 
 #[derive(Debug)]
 struct SignInError{
@@ -82,6 +85,8 @@ trait UserMutations {
     async fn sign_up(&self, ctx: &Context<'_>, input: SignUpInput) -> Result<AuthorizedUser, SignInError>;
     async fn sign_in(&self, ctx: &Context<'_>, input: SignInInput) -> Result<AuthorizedUser, SignInError>;
     async fn refresh_access_token(&self, ctx: &Context<'_>, refresh_token: String) -> Result<AuthorizedUser, AuthError>;
+    async fn logout(&self, ctx: &Context<'_>, refresh_token: String) -> Result<bool, AuthError>;
+    async fn logout_all_devices(&self, ctx: &Context<'_>, access_token: String) -> Result<bool, AuthError>;
 }
 
 #[Object]
@@ -94,21 +99,27 @@ impl UserMutations for UserMutation {
         let argon2 = Argon2::default();
         let password_hash = argon2.hash_password(&input.password.into_bytes(), &salt)?.to_string();
         let user_id = Uuid::new_v4();
-        let refresh_token = generate_refresh_token(user_id.to_string());
+        
         // User モデルを作ってinsertする
         let user = users::ActiveModel {
             id: ActiveValue::set(user_id),
             email: ActiveValue::set(input.email),
             password: ActiveValue::set(password_hash),
-            refresh_token: ActiveValue::set(Some(refresh_token)),
             ..Default::default()
         };
         let res = user.insert(db).await?;
 
+        // Create refresh token and store in separate table
+        let refresh_token = create_refresh_token(db, res.id, None).await
+            .map_err(|e| SignInError { message: e.to_string() })?;
+
+        // Opportunistic cleanup of expired tokens
+        let _ = cleanup_expired_tokens(db).await;
+
         // アクセストークンを生成して、AuthorizedUser を返す
         Ok::<AuthorizedUser, SignInError>(AuthorizedUser {
             token: generate_token(&res),
-            refresh_token: res.refresh_token.unwrap(),
+            refresh_token,
         })
     }
 
@@ -126,38 +137,75 @@ impl UserMutations for UserMutation {
             Err(SignInError { message: "Password is incorrect".to_string() })
         )?;
 
-        // リフレッシュトークンを生成して保存する
-        let refresh_token = generate_refresh_token(user.id.to_string());
-        let mut u = user.into_active_model();
-        u.refresh_token = Set(Some(refresh_token.clone()));
-        let res = u.update(db).await?;
+        // Create new refresh token for this session
+        let refresh_token = create_refresh_token(db, user.id, None).await
+            .map_err(|e| SignInError { message: e.to_string() })?;
+
+        // Opportunistic cleanup of expired tokens
+        let _ = cleanup_expired_tokens(db).await;
         
         Ok::<AuthorizedUser, SignInError>(AuthorizedUser {
-            token: generate_token(&res),
-            refresh_token: res.refresh_token.unwrap(),
+            token: generate_token(&user),
+            refresh_token,
         })
     }
 
     async fn refresh_access_token(&self, ctx: &Context<'_>, refresh_token: String) -> Result<AuthorizedUser, AuthError> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
-        let user = services::authentication::authenticator::get_user(db, &Token(refresh_token.clone())).await?;
+        // Validate the refresh token and get the refresh token record
+        let refresh_token_record = validate_refresh_token(db, &refresh_token).await
+            .map_err(|e| AuthError { message: e.message })?;
+
+        // Get the user associated with this refresh token
+        let user = services::authentication::authenticator::get_user(db, &Token::new(refresh_token.clone())).await?;
         
-        // Return error if a token saved in the database does not match the token passed in
-        if user.refresh_token != Some(refresh_token.clone()) {
+        // Ensure the token belongs to the correct user (extra security check)
+        if refresh_token_record.user_id != user.id {
             return Err::<AuthorizedUser, AuthError>(AuthError {
-                message: "Refresh token is invalid".to_string(),
+                message: "Refresh token does not belong to the authenticated user".to_string(),
             });
         }
-;
-        let refresh_token = generate_refresh_token(user.id.to_string());
-        let mut u = user.into_active_model();
-        u.refresh_token = Set(Some(refresh_token.clone()));
-        let res = u.update(db).await?;
+
+        // Generate a new access token
+        let new_access_token = generate_token(&user);
+
+        // Opportunistic cleanup of expired tokens
+        let _ = cleanup_expired_tokens(db).await;
 
         Ok::<AuthorizedUser, AuthError>(AuthorizedUser {
-            token: generate_token(&res),
-            refresh_token: res.refresh_token.unwrap(),
+            token: new_access_token,
+            refresh_token: refresh_token, // Return the same refresh token
         })
+    }
+
+    async fn logout(&self, ctx: &Context<'_>, refresh_token: String) -> Result<bool, AuthError> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        // Revoke the specific refresh token
+        revoke_refresh_token(db, &refresh_token).await
+            .map_err(|e| AuthError { message: e.message })?;
+
+        // Opportunistic cleanup of expired tokens
+        let _ = cleanup_expired_tokens(db).await;
+
+        Ok(true)
+    }
+
+    async fn logout_all_devices(&self, ctx: &Context<'_>, access_token: String) -> Result<bool, AuthError> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        // Get user from access token
+        let token = Token::new(access_token);
+        let user = services::authentication::authenticator::get_user(db, &token).await?;
+
+        // Revoke all refresh tokens for this user
+        revoke_all_refresh_tokens(db, user.id).await
+            .map_err(|e| AuthError { message: e.message })?;
+
+        // Opportunistic cleanup of expired tokens
+        let _ = cleanup_expired_tokens(db).await;
+
+        Ok(true)
     }
 }
