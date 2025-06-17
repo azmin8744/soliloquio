@@ -1,4 +1,4 @@
-use async_graphql::{Context, InputObject, Object, Result, SimpleObject, Union};
+use async_graphql::{Context, InputObject, Object, Result, Union};
 use std::fmt;
 use sea_orm::*;
 use models::{prelude::*, *};
@@ -11,51 +11,12 @@ use argon2::{
     Argon2
 };
 use crate::types::authorized_user::AuthorizedUser;
+use crate::errors::{DbErr, AuthError, ValidationErrorType};
 use services::authentication::token::{Token, generate_token};
 use services::authentication::refresh_token::{
     create_refresh_token, validate_refresh_token, revoke_refresh_token, revoke_all_refresh_tokens, cleanup_expired_tokens
 };
 use services::validation::ValidationError;
-
-// Error Types
-#[derive(SimpleObject, Debug)]
-pub struct ValidationErrorType {
-    message: String,
-}
-
-#[derive(SimpleObject, Debug)]
-pub struct DbErr {
-    message: String,
-}
-
-impl From<sea_orm::error::DbErr> for DbErr {
-    fn from(e: sea_orm::error::DbErr) -> Self {
-        DbErr { message: e.to_string() }
-    }
-}
-
-#[derive(SimpleObject, Debug)]
-pub struct AuthError {
-    message: String,
-}
-
-impl From<services::AuthenticationError> for AuthError {
-    fn from(e: services::AuthenticationError) -> Self {
-        AuthError { message: e.to_string() }
-    }
-}
-
-impl From<sea_orm::error::DbErr> for AuthError {
-    fn from(e: sea_orm::error::DbErr) -> Self {
-        AuthError { message: e.to_string() }
-    }
-}
-
-impl fmt::Display for AuthError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.message.as_str())
-    }
-}
 
 #[derive(Union)]
 pub enum UserMutationResult {

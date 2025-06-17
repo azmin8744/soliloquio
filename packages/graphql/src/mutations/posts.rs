@@ -1,42 +1,10 @@
-use async_graphql::{Context, InputObject, Object, Result, SimpleObject, Union};
+use async_graphql::{Context, InputObject, Object, Result, Union};
 use sea_orm::*;
-use std::fmt;
 use models::{prelude::*, *};
 use sea_orm::entity::prelude::Uuid;
 use crate::types::post::{Post as PostType, DeletedPost};
 use crate::utilities::requires_auth::RequiresAuth;
-
-#[derive(SimpleObject, Debug)]
-pub struct DbErr {
-    message: String,
-}
-
-impl From<sea_orm::error::DbErr> for DbErr {
-    fn from(e: sea_orm::error::DbErr) -> Self {
-        DbErr { message: e.to_string() }
-    }
-}
-
-impl fmt::Display for DbErr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.message.as_str())
-    }
-}
-
-#[derive(SimpleObject, Debug)]
-pub struct AuthError {
-    message: String,
-}
-impl From<crate::utilities::requires_auth::AuthenticationError> for AuthError {
-    fn from(e: crate::utilities::requires_auth::AuthenticationError) -> Self {
-        AuthError { message: e.to_string() }
-    }
-}
-impl fmt::Display for AuthError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.message.as_str())
-    }
-}
+use crate::errors::{DbErr, AuthError};
 
 #[derive(Union)]
 pub enum PostMutationResult {
