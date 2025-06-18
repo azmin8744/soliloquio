@@ -4,13 +4,13 @@ use models::{prelude::*, *};
 use sea_orm::entity::prelude::Uuid;
 use crate::types::post::{Post as PostType, DeletedPost};
 use crate::utilities::requires_auth::RequiresAuth;
-use crate::errors::{DbErr, AuthError};
+use crate::errors::{DbError, AuthError};
 
 #[derive(Union)]
 pub enum PostMutationResult {
     ChangedPost(PostType),
     DeletedPost(DeletedPost),
-    DbError(DbErr),
+    DbError(DbError),
     AuthError(AuthError),
 }
 
@@ -79,7 +79,7 @@ impl PostMutations for PostMutation {
         let res = match Posts::insert(post).exec(db).await {
             Ok(res) => res,
             Err(e) => {
-                return Ok(PostMutationResult::DbError(DbErr {
+                return Ok(PostMutationResult::DbError(DbError {
                     message: e.to_string(),
                 }));
             }
@@ -88,12 +88,12 @@ impl PostMutations for PostMutation {
         let p = match Posts::find_by_id(res.last_insert_id).one(db).await {
             Ok(Some(p)) => p,
             Ok(None) => {
-                return Ok(PostMutationResult::DbError(DbErr {
+                return Ok(PostMutationResult::DbError(DbError {
                     message: "Post not found".to_string(),
                 }));
             }
             Err(e) => {
-                return Ok(PostMutationResult::DbError(DbErr {
+                return Ok(PostMutationResult::DbError(DbError {
                     message: e.to_string(),
                 }));
             }
@@ -125,12 +125,12 @@ impl PostMutations for PostMutation {
         let mut post_to_update = match Posts::find_by_id(post.id).one(db).await {
             Ok(Some(p)) => p.into_active_model(),
             Ok(None) => {
-                return Ok(PostMutationResult::DbError(DbErr {
+                return Ok(PostMutationResult::DbError(DbError {
                     message: "Post not found".to_string(),
                 }));
             }
             Err(e) => {
-                return Ok(PostMutationResult::DbError(DbErr {
+                return Ok(PostMutationResult::DbError(DbError {
                     message: e.to_string(),
                 }));
             }
@@ -171,7 +171,7 @@ impl PostMutations for PostMutation {
                 }))
             },
             Err(e) => {
-                return Ok(PostMutationResult::DbError(DbErr {
+                return Ok(PostMutationResult::DbError(DbError {
                     message: e.to_string(),
                 }));
             }
@@ -193,12 +193,12 @@ impl PostMutations for PostMutation {
         let post_to_delete = match Posts::find_by_id(post.id).one(db).await {
             Ok(Some(p)) => p.into_active_model(),
             Ok(None) => {
-                return Ok(PostMutationResult::DbError(DbErr {
+                return Ok(PostMutationResult::DbError(DbError {
                     message: "Post not found".to_string(),
                 }));
             }
             Err(e) => {
-                return Ok(PostMutationResult::DbError(DbErr {
+                return Ok(PostMutationResult::DbError(DbError {
                     message: e.to_string(),
                 }));
             }
@@ -206,7 +206,7 @@ impl PostMutations for PostMutation {
 
         match Posts::delete(post_to_delete.clone()).exec(db).await {
             Ok(_) => Ok(PostMutationResult::DeletedPost(DeletedPost { id: post_to_delete.id.unwrap() })),
-            Err(e) => Ok(PostMutationResult::DbError(DbErr {
+            Err(e) => Ok(PostMutationResult::DbError(DbError {
                 message: e.to_string(),
             })),
         }

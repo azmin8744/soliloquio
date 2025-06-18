@@ -11,7 +11,7 @@ use argon2::{
     Argon2
 };
 use crate::types::authorized_user::AuthorizedUser;
-use crate::errors::{DbErr, AuthError, ValidationErrorType};
+use crate::errors::{DbError, AuthError, ValidationErrorType};
 use services::authentication::token::{Token, generate_token};
 use services::authentication::refresh_token::{
     create_refresh_token, validate_refresh_token, revoke_refresh_token, revoke_all_refresh_tokens, cleanup_expired_tokens
@@ -22,7 +22,7 @@ use services::validation::ValidationError;
 pub enum UserMutationResult {
     AuthorizedUser(AuthorizedUser),
     ValidationError(ValidationErrorType),
-    DbError(DbErr),
+    DbError(DbError),
     AuthError(AuthError),
 }
 
@@ -120,7 +120,7 @@ impl UserMutations for UserMutation {
  
         let res = match user.insert(db).await {
             Ok(user) => user,
-            Err(e) => return Ok(UserMutationResult::DbError(DbErr {
+            Err(e) => return Ok(UserMutationResult::DbError(DbError {
                 message: e.to_string()
             })),
         };
@@ -169,7 +169,7 @@ impl UserMutations for UserMutation {
             Ok(None) => return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
                 message: "Email or password incorrect".to_string() 
             })),
-            Err(e) => return Ok(UserMutationResult::DbError(DbErr {
+            Err(e) => return Ok(UserMutationResult::DbError(DbError {
                 message: e.to_string()
             })),
         };

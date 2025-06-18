@@ -3,17 +3,17 @@ use std::fmt;
 use services::AuthenticationError;
 
 #[derive(SimpleObject, Debug)]
-pub struct DbErr {
+pub struct DbError {
     pub message: String,
 }
 
-impl From<sea_orm::error::DbErr> for DbErr {
+impl From<sea_orm::error::DbErr> for DbError {
     fn from(e: sea_orm::error::DbErr) -> Self {
-        DbErr { message: e.to_string() }
+        DbError { message: e.to_string() }
     }
 }
 
-impl fmt::Display for DbErr {
+impl fmt::Display for DbError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.message.as_str())
     }
