@@ -14,6 +14,11 @@ type AuthorizedUser {
 }
 
 
+input ChangePasswordInput {
+	currentPassword: String!
+	newPassword: String!
+}
+
 type DbError {
 	message: String!
 }
@@ -38,6 +43,7 @@ type Mutations {
 	refreshAccessToken(refreshToken: String!): UserMutationResult!
 	logout(refreshToken: String!): Boolean!
 	logoutAllDevices(accessToken: String!): Boolean!
+	changePassword(input: ChangePasswordInput!): UserMutationResult!
 }
 
 """
@@ -48,6 +54,10 @@ ISO 8601 combined date and time without timezone.
 * `2015-07-01T08:59:60.123`,
 """
 scalar NaiveDateTime
+
+type PasswordChangeSuccess {
+	message: String!
+}
 
 type Post {
 	id: UUID!
@@ -107,7 +117,7 @@ input UpdatePostInput {
 	isPublished: Boolean
 }
 
-union UserMutationResult = AuthorizedUser | ValidationErrorType | DbError | AuthError
+union UserMutationResult = AuthorizedUser | ValidationErrorType | DbError | AuthError | PasswordChangeSuccess
 
 type ValidationErrorType {
 	message: String!

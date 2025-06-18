@@ -1,4 +1,4 @@
-use async_graphql::{Context, InputObject, Object, Result, Union};
+use async_graphql::{Context, InputObject, Object, Result, Union, SimpleObject};
 use std::fmt;
 use sea_orm::*;
 use models::{prelude::*, *};
@@ -12,11 +12,17 @@ use argon2::{
 };
 use crate::types::authorized_user::AuthorizedUser;
 use crate::errors::{DbError, AuthError, ValidationErrorType};
+use crate::utilities::requires_auth::RequiresAuth;
 use services::authentication::token::{Token, generate_token};
 use services::authentication::refresh_token::{
     create_refresh_token, validate_refresh_token, revoke_refresh_token, revoke_all_refresh_tokens, cleanup_expired_tokens
 };
 use services::validation::ValidationError;
+
+#[derive(SimpleObject)]
+pub struct PasswordChangeSuccess {
+    message: String,
+}
 
 #[derive(Union)]
 pub enum UserMutationResult {
@@ -24,6 +30,7 @@ pub enum UserMutationResult {
     ValidationError(ValidationErrorType),
     DbError(DbError),
     AuthError(AuthError),
+    PasswordChangeSuccess(PasswordChangeSuccess),
 }
 
 // Retain the SignInError struct for backward compatibility and conversions
@@ -74,13 +81,22 @@ struct SignInInput {
     password: String,
 }
 
+#[derive(InputObject)]
+struct ChangePasswordInput {
+    current_password: String,
+    new_password: String,
+}
+
 #[derive(Default)]
 pub struct UserMutation;
+
+impl RequiresAuth for UserMutation {}
 
 trait UserMutations {
     async fn sign_up(&self, ctx: &Context<'_>, input: SignUpInput) -> Result<UserMutationResult>;
     async fn sign_in(&self, ctx: &Context<'_>, input: SignInInput) -> Result<UserMutationResult>;
     async fn refresh_access_token(&self, ctx: &Context<'_>, refresh_token: String) -> Result<UserMutationResult>;
+    async fn change_password(&self, ctx: &Context<'_>, input: ChangePasswordInput) -> Result<UserMutationResult>;
     async fn logout(&self, ctx: &Context<'_>, refresh_token: String) -> Result<bool, AuthError>;
     async fn logout_all_devices(&self, ctx: &Context<'_>, access_token: String) -> Result<bool, AuthError>;
 }
@@ -271,5 +287,120 @@ impl UserMutations for UserMutation {
         let _ = cleanup_expired_tokens(db).await;
 
         Ok(true)
+    }
+
+    async fn change_password(&self, ctx: &Context<'_>, input: ChangePasswordInput) -> Result<UserMutationResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        // 1. Authenticate user
+        let current_user = match self.require_authenticate_as_user(ctx).await {
+            Ok(user) => user,
+            Err(e) => {
+                return Ok(UserMutationResult::AuthError(AuthError {
+                    message: e.to_string(),
+                }));
+            }
+        };
+
+        // 2. Validate input
+        if input.current_password.trim().is_empty() {
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType {
+                message: "Current password cannot be empty".to_string(),
+            }));
+        }
+
+        if input.new_password.trim().is_empty() {
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType {
+                message: "New password cannot be empty".to_string(),
+            }));
+        }
+
+        // 3. Verify current password
+        let parsed_hash = match PasswordHash::new(&current_user.password) {
+            Ok(hash) => hash,
+            Err(_) => {
+                return Ok(UserMutationResult::AuthError(AuthError {
+                    message: "Invalid password hash in database".to_string(),
+                }));
+            }
+        };
+
+        if Argon2::default()
+            .verify_password(&input.current_password.into_bytes(), &parsed_hash)
+            .is_err()
+        {
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType {
+                message: "Current password is incorrect".to_string(),
+            }));
+        }
+
+        // 4. Validate new password using existing validation
+        let temp_user = users::ActiveModel {
+            id: ActiveValue::set(current_user.id),
+            email: ActiveValue::set(current_user.email.clone()),
+            password: ActiveValue::set(input.new_password.clone()),
+            ..Default::default()
+        };
+
+        use services::validation::ActiveModelValidator;
+        if let Err(validation_error) = temp_user.validate() {
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType {
+                message: validation_error.to_string(),
+            }));
+        }
+
+        // 5. Check if new password is different from current
+        if Argon2::default()
+            .verify_password(&input.new_password.clone().into_bytes(), &parsed_hash)
+            .is_ok()
+        {
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType {
+                message: "New password must be different from current password".to_string(),
+            }));
+        }
+
+        // 6. Hash new password
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        let new_password_hash = match argon2.hash_password(&input.new_password.into_bytes(), &salt) {
+            Ok(hash) => hash.to_string(),
+            Err(_) => {
+                return Ok(UserMutationResult::AuthError(AuthError {
+                    message: "Failed to hash new password".to_string(),
+                }));
+            }
+        };
+
+        // 7. Update password in database
+        let user_id = current_user.id; // Store the ID before moving
+        let mut user_to_update = current_user.into_active_model();
+        user_to_update.password = ActiveValue::set(new_password_hash);
+        user_to_update.updated_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
+
+        match Users::update(user_to_update).exec(db).await {
+            Ok(_) => {},
+            Err(e) => {
+                return Ok(UserMutationResult::DbError(DbError {
+                    message: e.to_string(),
+                }));
+            }
+        }
+
+        // 8. Optional: Revoke all refresh tokens except current session
+        // This forces re-authentication on all other devices
+        match revoke_all_refresh_tokens(db, user_id).await {
+            Ok(_) => {},
+            Err(e) => {
+                // Log error but don't fail the password change
+                eprintln!("Warning: Failed to revoke refresh tokens: {}", e.message);
+            }
+        }
+
+        // 9. Cleanup expired tokens
+        let _ = cleanup_expired_tokens(db).await;
+
+        Ok(UserMutationResult::PasswordChangeSuccess(PasswordChangeSuccess {
+            message: "Password changed successfully. Please sign in again on other devices.".to_string(),
+        }))
     }
 }
