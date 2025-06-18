@@ -1,5 +1,4 @@
-use async_graphql::{Context, InputObject, Object, Result, Union, SimpleObject};
-use std::fmt;
+use async_graphql::{Context, Object, Result, SimpleObject, Union};
 use sea_orm::*;
 use models::{prelude::*, *};
 use sea_orm::entity::prelude::Uuid;
@@ -13,11 +12,12 @@ use argon2::{
 use crate::types::authorized_user::AuthorizedUser;
 use crate::errors::{DbError, AuthError, ValidationErrorType};
 use crate::utilities::requires_auth::RequiresAuth;
+use crate::mutations::input_validators::{SignUpInput, SignInInput, ChangePasswordInput};
 use services::authentication::token::{Token, generate_token};
 use services::authentication::refresh_token::{
     create_refresh_token, validate_refresh_token, revoke_refresh_token, revoke_all_refresh_tokens, cleanup_expired_tokens
 };
-use services::validation::ValidationError;
+use services::validation::input_validator::InputValidator;
 
 #[derive(SimpleObject)]
 pub struct PasswordChangeSuccess {
@@ -33,58 +33,14 @@ pub enum UserMutationResult {
     PasswordChangeSuccess(PasswordChangeSuccess),
 }
 
-// Retain the SignInError struct for backward compatibility and conversions
-#[derive(Debug)]
-struct SignInError {
-    pub message: String,
-}
-
-impl SignInError {
-    pub fn to_string(&self) -> String {
-        self.message.clone()
-    }
-}
-
-impl fmt::Display for SignInError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.to_string().as_str())
-    }
-}
-
-impl From<sea_orm::error::DbErr> for SignInError {
-    fn from(e: sea_orm::error::DbErr) -> Self {
-        SignInError { message: e.to_string() }
-    }
-}
-
-impl From<argon2::password_hash::Error> for SignInError {
-    fn from(e: argon2::password_hash::Error) -> Self {
-        SignInError { message: e.to_string() }
-    }
-}
-
-impl From<ValidationError> for SignInError {
-    fn from(e: ValidationError) -> Self {
-        SignInError { message: e.to_string() }
-    }
-}
-
-#[derive(InputObject)]
-struct SignUpInput {
-    email: String,
-    password: String,
-}
-
-#[derive(InputObject)]
-struct SignInInput {
-    email: String,
-    password: String,
-}
-
-#[derive(InputObject)]
-struct ChangePasswordInput {
-    current_password: String,
-    new_password: String,
+// Helper function to convert validation errors to GraphQL response
+fn validation_errors_to_message(errors: services::validation::input_validator::ValidationErrors) -> String {
+    errors
+        .values()
+        .flatten()
+        .cloned()
+        .collect::<Vec<String>>()
+        .join(", ")
 }
 
 #[derive(Default)]
@@ -106,23 +62,14 @@ impl UserMutations for UserMutation {
     async fn sign_up(&self, ctx: &Context<'_>, input: SignUpInput) -> Result<UserMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
         
-        // Create user model for validation
-        let mut user = users::ActiveModel {
-            id: ActiveValue::set(Uuid::new_v4()),
-            email: ActiveValue::set(input.email.clone()),
-            password: ActiveValue::set(input.password.clone()),
-            ..Default::default()
-        };
-        
-        // Validate the user model before proceeding
-        use services::validation::ActiveModelValidator;
-        if let Err(validation_error) = user.validate() {
-            return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
-                message: validation_error.to_string() 
+        // Validate input
+        if let Err(validation_errors) = input.validate() {
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType {
+                message: validation_errors_to_message(validation_errors),
             }));
         }
         
-        // Generate salt and hash the password
+        // Hash password
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
         let password_hash = match argon2.hash_password(&input.password.into_bytes(), &salt) {
@@ -132,8 +79,14 @@ impl UserMutations for UserMutation {
             })),
         };
         
-        user.password = ActiveValue::set(password_hash.clone());
- 
+        // Create user
+        let user = users::ActiveModel {
+            id: ActiveValue::set(Uuid::new_v4()),
+            email: ActiveValue::set(input.email),
+            password: ActiveValue::set(password_hash),
+            ..Default::default()
+        };
+        
         let res = match user.insert(db).await {
             Ok(user) => user,
             Err(e) => return Ok(UserMutationResult::DbError(DbError {
@@ -141,7 +94,7 @@ impl UserMutations for UserMutation {
             })),
         };
 
-        // Create refresh token and store in separate table
+        // Create refresh token
         let refresh_token = match create_refresh_token(db, res.id, None).await {
             Ok(token) => token,
             Err(e) => return Ok(UserMutationResult::AuthError(AuthError {
@@ -149,10 +102,8 @@ impl UserMutations for UserMutation {
             })),
         };
 
-        // Opportunistic cleanup of expired tokens
         let _ = cleanup_expired_tokens(db).await;
 
-        // Generate access token and return AuthorizedUser
         Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
             token: generate_token(&res),
             refresh_token,
@@ -162,22 +113,16 @@ impl UserMutations for UserMutation {
     async fn sign_in(&self, ctx: &Context<'_>, input: SignInInput) -> Result<UserMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
         
-        // Basic input validation
-        if input.email.trim().is_empty() {
-            return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
-                message: "Email cannot be empty".to_string() 
-            }));
-        }
-        
-        if input.password.trim().is_empty() {
-            return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
-                message: "Password cannot be empty".to_string() 
+        // Validate input
+        if let Err(validation_errors) = input.validate() {
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType {
+                message: validation_errors_to_message(validation_errors),
             }));
         }
         
         // Find user
         let user = match Users::find()
-            .filter(users::Column::Email.contains(input.email))
+            .filter(users::Column::Email.contains(&input.email))
             .one(db)
             .await 
         {
@@ -204,7 +149,7 @@ impl UserMutations for UserMutation {
             }));
         }
 
-        // Create new refresh token for this session
+        // Create refresh token and return success
         let refresh_token = match create_refresh_token(db, user.id, None).await {
             Ok(token) => token,
             Err(e) => return Ok(UserMutationResult::AuthError(AuthError {
@@ -212,7 +157,6 @@ impl UserMutations for UserMutation {
             })),
         };
 
-        // Opportunistic cleanup of expired tokens
         let _ = cleanup_expired_tokens(db).await;
         
         Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
@@ -303,15 +247,9 @@ impl UserMutations for UserMutation {
         };
 
         // 2. Validate input
-        if input.current_password.trim().is_empty() {
+        if let Err(validation_errors) = input.validate() {
             return Ok(UserMutationResult::ValidationError(ValidationErrorType {
-                message: "Current password cannot be empty".to_string(),
-            }));
-        }
-
-        if input.new_password.trim().is_empty() {
-            return Ok(UserMutationResult::ValidationError(ValidationErrorType {
-                message: "New password cannot be empty".to_string(),
+                message: validation_errors_to_message(validation_errors),
             }));
         }
 
