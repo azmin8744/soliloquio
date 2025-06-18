@@ -1,5 +1,5 @@
 use sea_orm::*;
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use uuid::Uuid;
 use models::refresh_tokens::{self, Entity as RefreshTokens, Model as RefreshToken};
 use super::token::{generate_refresh_token, hash_token, AuthError, Token};
