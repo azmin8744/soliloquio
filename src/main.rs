@@ -1,6 +1,7 @@
 use actix_web::{
-    guard, http::header::HeaderMap, web, App, HttpRequest, HttpResponse, HttpServer, Result,
+    guard, web, App, HttpRequest, HttpResponse, HttpServer, Result,
 };
+use actix_cors::Cors;
 use async_graphql::{http::GraphiQLSource, Schema};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 mod setup;
@@ -13,10 +14,29 @@ use services::authentication::Token;
 
 type SchemaType = Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 
-fn get_token_from_headers(headers: &HeaderMap) -> Option<Token> {
-    headers
-        .get("Authorization")
-        .and_then(|value| value.to_str().map(|s| Token(s.to_string())).ok())
+fn get_token_from_request(req: &HttpRequest) -> Option<Token> {
+    // First check Authorization header
+    if let Some(auth_header) = req.headers().get("Authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            return Some(Token(auth_str.to_string()));
+        }
+    }
+    
+    // Then check for access_token cookie
+    if let Some(cookie_header) = req.headers().get("cookie") {
+        if let Ok(cookie_str) = cookie_header.to_str() {
+            // Parse cookies manually to find access_token
+            for cookie_pair in cookie_str.split(';') {
+                let cookie_pair = cookie_pair.trim();
+                if cookie_pair.starts_with("access_token=") {
+                    let token = cookie_pair.trim_start_matches("access_token=");
+                    return Some(Token(token.to_string()));
+                }
+            }
+        }
+    }
+    
+    None
 }
 
 async fn graphiql() -> HttpResponse {
@@ -36,7 +56,7 @@ async fn index(
     gql_request: GraphQLRequest,
 ) -> GraphQLResponse {
     let mut request = gql_request.into_inner();
-    if let Some(token) = get_token_from_headers(req.headers()) {
+    if let Some(token) = get_token_from_request(&req) {
         request = request.data(token);
     }
     schema.execute(request).await.into()
@@ -70,6 +90,13 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
+            .wrap(
+                Cors::default()
+                    .allowed_origin("http://localhost:8001")
+                    .allowed_methods(vec!["GET", "POST"])
+                    .allowed_headers(vec!["content-type", "authorization"])
+                    .supports_credentials()
+            )
             .app_data(web::Data::new(schema.clone()))
             .service(web::resource("/").guard(guard::Get()).to(graphiql))
             .service(web::resource("/").guard(guard::Post()).to(index))

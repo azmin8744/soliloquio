@@ -9,6 +9,7 @@ use argon2::{
     },
     Argon2
 };
+use actix_web::cookie::{Cookie, SameSite};
 use crate::types::authorized_user::AuthorizedUser;
 use crate::errors::{DbError, AuthError, ValidationErrorType};
 use crate::utilities::requires_auth::RequiresAuth;
@@ -104,8 +105,31 @@ impl UserMutations for UserMutation {
 
         let _ = cleanup_expired_tokens(db).await;
 
+        let access_token = generate_token(&res);
+        
+        // Set httpOnly cookies for both access and refresh tokens
+        let access_cookie = Cookie::build("access_token", &access_token)
+            .http_only(true)
+            .secure(false) // Set to true in production with HTTPS
+            .same_site(SameSite::Lax)
+            .path("/")
+            .max_age(actix_web::cookie::time::Duration::hours(1))
+            .finish();
+
+        let refresh_cookie = Cookie::build("refresh_token", &refresh_token)
+            .http_only(true)
+            .secure(false) // Set to true in production with HTTPS
+            .same_site(SameSite::Lax)
+            .path("/")
+            .max_age(actix_web::cookie::time::Duration::days(7))
+            .finish();
+
+        // Set cookies via GraphQL context
+        ctx.insert_http_header("Set-Cookie", access_cookie.to_string());
+        ctx.append_http_header("Set-Cookie", refresh_cookie.to_string());
+
         Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
-            token: generate_token(&res),
+            token: access_token,
             refresh_token,
         }))
     }
@@ -159,8 +183,31 @@ impl UserMutations for UserMutation {
 
         let _ = cleanup_expired_tokens(db).await;
         
+        let access_token = generate_token(&user);
+        
+        // Set httpOnly cookies for both access and refresh tokens
+        let access_cookie = Cookie::build("access_token", &access_token)
+            .http_only(true)
+            .secure(false) // Set to true in production with HTTPS
+            .same_site(SameSite::Lax) // Lax instead of Strict for better compatibility
+            .path("/")
+            .max_age(actix_web::cookie::time::Duration::hours(1))
+            .finish();
+
+        let refresh_cookie = Cookie::build("refresh_token", &refresh_token)
+            .http_only(true)
+            .secure(false) // Set to true in production with HTTPS
+            .same_site(SameSite::Lax)
+            .path("/")
+            .max_age(actix_web::cookie::time::Duration::days(7))
+            .finish();
+
+        // Set cookies via GraphQL context
+        ctx.insert_http_header("Set-Cookie", access_cookie.to_string());
+        ctx.append_http_header("Set-Cookie", refresh_cookie.to_string());
+        
         Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
-            token: generate_token(&user),
+            token: access_token,
             refresh_token,
         }))
     }
