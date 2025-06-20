@@ -1,55 +1,75 @@
-use async_graphql::{Context, Object};
+use async_graphql::{Context, Object, Result};
 use sea_orm::*;
 use models::prelude::*;
 use sea_orm::entity::prelude::Uuid;
-use crate::queries::Queries;
 use crate::types::post::Post as PostType;
+use crate::utilities::requires_auth::RequiresAuth;
+use crate::errors::AuthError;
 
-trait PostQueries {
-    async fn posts(&self, ctx: &Context<'_>) -> Result<Vec<PostType>, DbErr>;
-    async fn post(&self, ctx: &Context<'_>, id: Uuid) -> Result<Option<PostType>, DbErr>;
-}
+#[derive(Default)]
+pub struct PostQueries;
+
+impl RequiresAuth for PostQueries {}
 
 #[Object]
-impl PostQueries for Queries {
-    async fn posts(&self, ctx: &Context<'_>) -> Result<Vec<PostType>, DbErr> {
+impl PostQueries {
+    /// Get all posts for the authenticated user
+    async fn posts(&self, ctx: &Context<'_>) -> Result<Vec<PostType>, AuthError> {
+        let user = self.require_authenticate_as_user(ctx).await?;
         let db = ctx.data::<DatabaseConnection>().unwrap();
-        let res = Posts::find().all(db).await;
-        assert_eq!(res.is_ok(), true);
-        let posts = res.unwrap();
-        let mut vec: Vec<PostType> = Vec::new();
-        for post in &posts {
-            let p = PostType { 
+        
+        let posts = Posts::find()
+            .filter(models::posts::Column::UserId.eq(user.id))
+            .order_by_desc(models::posts::Column::CreatedAt)
+            .all(db)
+            .await
+            .map_err(|e| AuthError {
+                message: format!("Database error: {}", e)
+            })?;
+
+        let mut result: Vec<PostType> = Vec::new();
+        for post in posts {
+            let p = PostType {
                 id: post.id,
-                title: post.title.clone(),
-                markdown_content: post.markdown_content.clone().unwrap_or_default(),
+                title: post.title,
+                markdown_content: post.markdown_content.unwrap_or_default(),
                 is_published: post.is_published,
                 first_published_at: post.first_published_at,
                 created_at: post.created_at,
                 updated_at: post.updated_at,
-             };
-            vec.push(p);
+            };
+            result.push(p);
         }
-        Ok::<Vec<PostType>, DbErr>(vec)
+        
+        Ok(result)
     }
 
-    async fn post(&self, ctx: &Context<'_>, id: Uuid) -> Result<Option<PostType>, DbErr> {
+    /// Get a specific post by ID for the authenticated user
+    async fn post(&self, ctx: &Context<'_>, id: Uuid) -> Result<Option<PostType>, AuthError> {
+        let user = self.require_authenticate_as_user(ctx).await?;
         let db = ctx.data::<DatabaseConnection>().unwrap();
-        let res = Posts::find_by_id(id).one(db).await;
-        assert_eq!(res.is_ok(), true);
-        if let Some(post) = res.unwrap() {
-            let p = PostType { 
+        
+        let post = Posts::find_by_id(id)
+            .filter(models::posts::Column::UserId.eq(user.id))
+            .one(db)
+            .await
+            .map_err(|e| AuthError {
+                message: format!("Database error: {}", e)
+            })?;
+
+        if let Some(post) = post {
+            let p = PostType {
                 id: post.id,
-                title: post.title.clone(),
-                markdown_content: post.markdown_content.clone().unwrap_or_default(),
+                title: post.title,
+                markdown_content: post.markdown_content.unwrap_or_default(),
                 is_published: post.is_published,
                 first_published_at: post.first_published_at,
                 created_at: post.created_at,
                 updated_at: post.updated_at,
-             };
-            Ok::<Option<PostType>, DbErr>(Some(p))
+            };
+            Ok(Some(p))
         } else {
-            Ok::<Option<PostType>, DbErr>(None)
+            Ok(None)
         }
     }
 }

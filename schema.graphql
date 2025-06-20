@@ -79,7 +79,17 @@ type Post {
 union PostMutationResult = Post | DeletedPost | DbError | AuthError
 
 type Queries {
+	"""
+	Get the currently authenticated user's profile
+	"""
+	me: User
+	"""
+	Get all posts for the authenticated user
+	"""
 	posts: [Post!]!
+	"""
+	Get a specific post by ID for the authenticated user
+	"""
 	post(id: UUID!): Post
 }
 
@@ -115,6 +125,13 @@ input UpdatePostInput {
 	title: String!
 	content: String!
 	isPublished: Boolean
+}
+
+type User {
+	id: UUID!
+	email: String!
+	createdAt: NaiveDateTime
+	updatedAt: NaiveDateTime
 }
 
 union UserMutationResult = AuthorizedUser | ValidationErrorType | DbError | AuthError | PasswordChangeSuccess

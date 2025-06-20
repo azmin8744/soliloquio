@@ -81,7 +81,7 @@ async fn main() -> std::io::Result<()> {
 
     let markdown_cache = MarkdownCache::new();
 
-    let schema = Schema::build(QueryRoot, MutationRoot::default(), SubscriptionRoot)
+    let schema = Schema::build(QueryRoot::default(), MutationRoot::default(), SubscriptionRoot)
     .data(db) // Add the database connection to the GraphQL global context
     .data(markdown_cache) // Add the markdown cache to the GraphQL global context
     .finish();
