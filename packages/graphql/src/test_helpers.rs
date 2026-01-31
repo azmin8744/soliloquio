@@ -112,3 +112,31 @@ pub async fn cleanup_test_post(db: &DatabaseConnection, post_id: Uuid) {
 pub fn create_access_token(user: &models::users::Model) -> String {
     services::authentication::token::generate_token(user)
 }
+
+pub fn create_expired_access_token(user: &models::users::Model) -> String {
+    use chrono::{Duration, Utc};
+    use jsonwebtoken::{encode, EncodingKey, Header};
+    use services::authentication::claims::Claims;
+
+    dotenvy::dotenv().ok();
+    let secret = std::env::var("TOKEN_SECRET").unwrap_or_else(|_| "secret".to_string());
+
+    let expiration = Utc::now()
+        .checked_sub_signed(Duration::hours(1))
+        .unwrap();
+
+    let claims = Claims {
+        iss: "localhost".to_string(),
+        sub: user.id.to_string(),
+        exp: expiration.timestamp(),
+        iat: Utc::now().timestamp(),
+        jti: Uuid::new_v4().to_string(),
+    };
+
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_ref()),
+    )
+    .unwrap()
+}

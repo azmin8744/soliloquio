@@ -1561,6 +1561,7 @@ dependencies = [
  "dashmap",
  "dotenvy",
  "futures-util",
+ "jsonwebtoken",
  "models",
  "password-hash",
  "pulldown-cmark",
