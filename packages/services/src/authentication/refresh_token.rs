@@ -504,9 +504,10 @@ mod tests {
         };
         expired_model.insert(&db).await.unwrap();
 
-        let deleted = cleanup_expired_tokens(&db).await.unwrap();
-        assert!(deleted >= 1);
+        // run cleanup (don't check count - other tests may run cleanup concurrently)
+        cleanup_expired_tokens(&db).await.unwrap();
 
+        // verify our expired token was removed
         let found = RefreshTokens::find()
             .filter(refresh_tokens::Column::TokenHash.eq(&token_hash))
             .one(&db)

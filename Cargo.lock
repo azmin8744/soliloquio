@@ -1559,6 +1559,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "dashmap",
+ "dotenvy",
  "futures-util",
  "models",
  "password-hash",
@@ -1567,6 +1568,7 @@ dependencies = [
  "serde",
  "serde_json",
  "services",
+ "tokio",
  "uuid",
 ]
 
