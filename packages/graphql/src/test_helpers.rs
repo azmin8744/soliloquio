@@ -74,3 +74,41 @@ pub fn generate_unique_email(prefix: &str) -> String {
 pub fn valid_password() -> String {
     "SecureP@ssw0rd123!".to_string()
 }
+
+pub async fn create_test_post(
+    db: &DatabaseConnection,
+    user_id: Uuid,
+    title: &str,
+    content: &str,
+    is_published: bool,
+) -> models::posts::Model {
+    use models::posts;
+
+    let first_published_at = if is_published {
+        Some(chrono::Utc::now().naive_utc())
+    } else {
+        None
+    };
+
+    let post = posts::ActiveModel {
+        id: ActiveValue::Set(Uuid::new_v4()),
+        title: ActiveValue::Set(title.to_string()),
+        markdown_content: ActiveValue::Set(Some(content.to_string())),
+        user_id: ActiveValue::Set(user_id),
+        is_published: ActiveValue::Set(is_published),
+        first_published_at: ActiveValue::Set(first_published_at),
+        created_at: ActiveValue::Set(Some(chrono::Utc::now().naive_utc())),
+        updated_at: ActiveValue::Set(None),
+    };
+
+    post.insert(db).await.expect("Failed to create test post")
+}
+
+pub async fn cleanup_test_post(db: &DatabaseConnection, post_id: Uuid) {
+    use models::posts;
+    posts::Entity::delete_by_id(post_id).exec(db).await.ok();
+}
+
+pub fn create_access_token(user: &models::users::Model) -> String {
+    services::authentication::token::generate_token(user)
+}
