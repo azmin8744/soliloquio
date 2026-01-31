@@ -8,6 +8,8 @@ use sha2::{Sha256, Digest};
 use base64::{engine::general_purpose, Engine};
 
 pub struct Token(pub String);
+
+#[derive(Debug)]
 pub struct AuthError {
     pub message: String,
 }
