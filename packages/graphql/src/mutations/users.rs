@@ -230,7 +230,7 @@ impl UserMutations for UserMutation {
                 message: e.to_string()
             })),
         };
-        
+
         // Ensure the token belongs to the correct user (extra security check)
         if refresh_token_record.user_id != user.id {
             return Ok(UserMutationResult::AuthError(AuthError {
@@ -240,6 +240,17 @@ impl UserMutations for UserMutation {
 
         // Generate a new access token
         let new_access_token = generate_token(&user);
+
+        // Set httpOnly cookie for new access token
+        let access_cookie = Cookie::build("access_token", &new_access_token)
+            .http_only(true)
+            .secure(false) // Set to true in production with HTTPS
+            .same_site(SameSite::Lax)
+            .path("/")
+            .max_age(actix_web::cookie::time::Duration::hours(1))
+            .finish();
+
+        ctx.insert_http_header("Set-Cookie", access_cookie.to_string());
 
         // Opportunistic cleanup of expired tokens
         let _ = cleanup_expired_tokens(db).await;
@@ -256,6 +267,26 @@ impl UserMutations for UserMutation {
         // Revoke the specific refresh token
         revoke_refresh_token(db, &refresh_token).await
             .map_err(|e| AuthError { message: e.message })?;
+
+        // Clear cookies by setting expired ones
+        let expired_access = Cookie::build("access_token", "")
+            .http_only(true)
+            .secure(false)
+            .same_site(SameSite::Lax)
+            .path("/")
+            .max_age(actix_web::cookie::time::Duration::seconds(0))
+            .finish();
+
+        let expired_refresh = Cookie::build("refresh_token", "")
+            .http_only(true)
+            .secure(false)
+            .same_site(SameSite::Lax)
+            .path("/")
+            .max_age(actix_web::cookie::time::Duration::seconds(0))
+            .finish();
+
+        ctx.insert_http_header("Set-Cookie", expired_access.to_string());
+        ctx.append_http_header("Set-Cookie", expired_refresh.to_string());
 
         // Opportunistic cleanup of expired tokens
         let _ = cleanup_expired_tokens(db).await;
