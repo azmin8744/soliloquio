@@ -113,7 +113,7 @@ impl PostMutations for PostMutation {
     async fn update_post(&self, ctx: &Context<'_>, post: UpdatePostInput) -> Result<PostMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
-        let _user = match self.require_authenticate_as_user(ctx).await {
+        let user = match self.require_authenticate_as_user(ctx).await {
             Ok(user) => user,
             Err(e) => {
                 return Ok(PostMutationResult::AuthError(AuthError {
@@ -122,7 +122,9 @@ impl PostMutations for PostMutation {
             }
         };
 
-        let mut post_to_update = match Posts::find_by_id(post.id).one(db).await {
+        let mut post_to_update = match Posts::find_by_id(post.id)
+            .filter(models::posts::Column::UserId.eq(user.id))
+            .one(db).await {
             Ok(Some(p)) => p.into_active_model(),
             Ok(None) => {
                 return Ok(PostMutationResult::DbError(DbError {
@@ -181,7 +183,7 @@ impl PostMutations for PostMutation {
     async fn delete_post(&self, ctx: &Context<'_>, post: DeletePostInput) -> Result<PostMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
-        let _user = match self.require_authenticate_as_user(ctx).await {
+        let user = match self.require_authenticate_as_user(ctx).await {
             Ok(user) => user,
             Err(e) => {
                 return Ok(PostMutationResult::AuthError(AuthError {
@@ -190,7 +192,9 @@ impl PostMutations for PostMutation {
             }
         };
 
-        let post_to_delete = match Posts::find_by_id(post.id).one(db).await {
+        let post_to_delete = match Posts::find_by_id(post.id)
+            .filter(models::posts::Column::UserId.eq(user.id))
+            .one(db).await {
             Ok(Some(p)) => p.into_active_model(),
             Ok(None) => {
                 return Ok(PostMutationResult::DbError(DbError {
@@ -648,5 +652,82 @@ mod tests {
             .contains("not found"));
 
         cleanup_test_user_by_email(&db, &email).await;
+    }
+
+    // ============= ownership tests =============
+
+    #[tokio::test]
+    async fn test_update_post_other_users_post_returns_not_found() {
+        let db = setup_test_db().await;
+        let schema = create_test_schema(db.clone());
+        let email_a = generate_unique_email("own_upd_a");
+        let email_b = generate_unique_email("own_upd_b");
+        let user_a = create_test_user_with_password(&db, &email_a, &valid_password()).await;
+        let user_b = create_test_user_with_password(&db, &email_b, &valid_password()).await;
+        let token_b = create_access_token(&user_b);
+        let post = create_test_post(&db, user_a.id, "A's Post", "content", false).await;
+
+        let query = format!(
+            r#"mutation {{
+                updatePost(post: {{ id: "{}", title: "Hijacked", content: "evil" }}) {{
+                    ... on DbError {{ message }}
+                    ... on Post {{ id }}
+                }}
+            }}"#,
+            post.id
+        );
+
+        let res = schema
+            .execute(Request::new(&query).data(Token::new(token_b)))
+            .await;
+        let data = res.data.into_json().unwrap();
+
+        assert!(data["updatePost"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("not found"));
+
+        cleanup_test_user_by_email(&db, &email_a).await;
+        cleanup_test_user_by_email(&db, &email_b).await;
+    }
+
+    #[tokio::test]
+    async fn test_delete_post_other_users_post_returns_not_found() {
+        let db = setup_test_db().await;
+        let schema = create_test_schema(db.clone());
+        let email_a = generate_unique_email("own_del_a");
+        let email_b = generate_unique_email("own_del_b");
+        let user_a = create_test_user_with_password(&db, &email_a, &valid_password()).await;
+        let user_b = create_test_user_with_password(&db, &email_b, &valid_password()).await;
+        let token_b = create_access_token(&user_b);
+        let post = create_test_post(&db, user_a.id, "A's Post", "content", false).await;
+
+        let query = format!(
+            r#"mutation {{
+                deletePost(post: {{ id: "{}" }}) {{
+                    ... on DbError {{ message }}
+                    ... on DeletedPost {{ id }}
+                }}
+            }}"#,
+            post.id
+        );
+
+        let res = schema
+            .execute(Request::new(&query).data(Token::new(token_b)))
+            .await;
+        let data = res.data.into_json().unwrap();
+
+        assert!(data["deletePost"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("not found"));
+
+        // verify post still exists
+        use models::posts::Entity as Posts;
+        let found = Posts::find_by_id(post.id).one(&db).await.unwrap();
+        assert!(found.is_some());
+
+        cleanup_test_user_by_email(&db, &email_a).await;
+        cleanup_test_user_by_email(&db, &email_b).await;
     }
 }
