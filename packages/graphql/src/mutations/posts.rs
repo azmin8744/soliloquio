@@ -79,6 +79,7 @@ impl PostMutations for PostMutation {
         let res = match Posts::insert(post).exec(db).await {
             Ok(res) => res,
             Err(e) => {
+                tracing::error!("failed to insert post");
                 return Ok(PostMutationResult::DbError(DbError {
                     message: e.to_string(),
                 }));

@@ -36,15 +36,21 @@ pub async fn validate_refresh_token(
     let now = Utc::now().naive_utc();
 
     // Find the refresh token by hash and ensure it's not expired
-    let refresh_token = RefreshTokens::find()
+    let refresh_token = match RefreshTokens::find()
         .filter(refresh_tokens::Column::TokenHash.eq(token_hash))
         .filter(refresh_tokens::Column::ExpiresAt.gt(now))
         .one(db)
         .await
         .map_err(|e| AuthError { message: e.to_string() })?
-        .ok_or(AuthError {
-            message: "Invalid or expired refresh token".to_string(),
-        })?;
+    {
+        Some(rt) => rt,
+        None => {
+            tracing::warn!("invalid or expired refresh token");
+            return Err(AuthError {
+                message: "Invalid or expired refresh token".to_string(),
+            });
+        }
+    };
 
     // Update last_used_at timestamp
     let mut active_model = refresh_token.clone().into_active_model();
@@ -96,6 +102,9 @@ pub async fn cleanup_expired_tokens(db: &DatabaseConnection) -> Result<u64, DbEr
         .exec(db)
         .await?;
 
+    if result.rows_affected > 0 {
+        tracing::debug!(count = result.rows_affected, "cleaned up expired tokens");
+    }
     Ok(result.rows_affected)
 }
 

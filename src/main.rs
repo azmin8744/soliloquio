@@ -4,6 +4,7 @@ use actix_web::{
 use actix_cors::Cors;
 use async_graphql::{http::GraphiQLSource, Schema};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
+use tracing_actix_web::TracingLogger;
 mod setup;
 use setup::set_up_db;
 use graphql::queries::Queries as QueryRoot;
@@ -74,6 +75,21 @@ async fn index_ws(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
+    let log_format = std::env::var("LOG_FORMAT").unwrap_or_default();
+    if log_format.eq_ignore_ascii_case("json") {
+        tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
+            .json()
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
+            .init();
+    }
+
     let db = match set_up_db().await {
         Ok(db) => db,
         Err(err) => panic!("{}", err),
@@ -86,10 +102,11 @@ async fn main() -> std::io::Result<()> {
     .data(markdown_cache) // Add the markdown cache to the GraphQL global context
     .finish();
 
-    println!("GraphiQL IDE: http://localhost:8000");
+    tracing::info!("GraphiQL IDE: http://localhost:8000");
 
     HttpServer::new(move || {
         App::new()
+            .wrap(TracingLogger::default())
             .wrap(
                 Cors::default()
                     .allowed_origin("http://localhost:8001")

@@ -90,9 +90,12 @@ impl UserMutations for UserMutation {
         
         let res = match user.insert(db).await {
             Ok(user) => user,
-            Err(e) => return Ok(UserMutationResult::DbError(DbError {
-                message: e.to_string()
-            })),
+            Err(e) => {
+                tracing::warn!("signup DB error");
+                return Ok(UserMutationResult::DbError(DbError {
+                    message: e.to_string()
+                }));
+            }
         };
 
         // Create refresh token
@@ -128,6 +131,7 @@ impl UserMutations for UserMutation {
         ctx.insert_http_header("Set-Cookie", access_cookie.to_string());
         ctx.append_http_header("Set-Cookie", refresh_cookie.to_string());
 
+        tracing::info!(user_id = %res.id, "signup success");
         Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
             token: access_token,
             refresh_token,
@@ -151,9 +155,12 @@ impl UserMutations for UserMutation {
             .await 
         {
             Ok(Some(user)) => user,
-            Ok(None) => return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
-                message: "Email or password incorrect".to_string() 
-            })),
+            Ok(None) => {
+                tracing::warn!("signin failed: email not found");
+                return Ok(UserMutationResult::ValidationError(ValidationErrorType {
+                    message: "Email or password incorrect".to_string()
+                }));
+            }
             Err(e) => return Ok(UserMutationResult::DbError(DbError {
                 message: e.to_string()
             })),
@@ -168,8 +175,9 @@ impl UserMutations for UserMutation {
         };
 
         if Argon2::default().verify_password(&input.password.into_bytes(), &parsed_hash).is_err() {
-            return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
-                message: "Email or password incorrect".to_string() 
+            tracing::warn!("signin failed: wrong password");
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType {
+                message: "Email or password incorrect".to_string()
             }));
         }
 
@@ -206,6 +214,7 @@ impl UserMutations for UserMutation {
         ctx.insert_http_header("Set-Cookie", access_cookie.to_string());
         ctx.append_http_header("Set-Cookie", refresh_cookie.to_string());
         
+        tracing::info!(user_id = %user.id, "signin success");
         Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
             token: access_token,
             refresh_token,
@@ -233,6 +242,7 @@ impl UserMutations for UserMutation {
 
         // Ensure the token belongs to the correct user (extra security check)
         if refresh_token_record.user_id != user.id {
+            tracing::warn!("refresh token user_id mismatch");
             return Ok(UserMutationResult::AuthError(AuthError {
                 message: "Refresh token does not belong to the authenticated user".to_string(),
             }));
@@ -287,6 +297,8 @@ impl UserMutations for UserMutation {
 
         ctx.insert_http_header("Set-Cookie", expired_access.to_string());
         ctx.append_http_header("Set-Cookie", expired_refresh.to_string());
+
+        tracing::info!("logout");
 
         // Opportunistic cleanup of expired tokens
         let _ = cleanup_expired_tokens(db).await;
@@ -406,15 +418,15 @@ impl UserMutations for UserMutation {
         // This forces re-authentication on all other devices
         match revoke_all_refresh_tokens(db, user_id).await {
             Ok(_) => {},
-            Err(e) => {
-                // Log error but don't fail the password change
-                eprintln!("Warning: Failed to revoke refresh tokens: {}", e.message);
+            Err(_e) => {
+                tracing::warn!("failed to revoke refresh tokens on password change");
             }
         }
 
         // 9. Cleanup expired tokens
         let _ = cleanup_expired_tokens(db).await;
 
+        tracing::info!(user_id = %user_id, "password changed");
         Ok(UserMutationResult::PasswordChangeSuccess(PasswordChangeSuccess {
             message: "Password changed successfully. Please sign in again on other devices.".to_string(),
         }))
@@ -788,7 +800,6 @@ mod tests {
         let signin_res = schema.execute(Request::new(&signin_query)).await;
         let signin_data = signin_res.data.into_json().unwrap();
         let refresh_token = signin_data["signIn"]["refreshToken"].as_str().unwrap();
-        let original_token = signin_data["signIn"]["token"].as_str().unwrap();
 
         // Refresh
         let refresh_query = format!(
