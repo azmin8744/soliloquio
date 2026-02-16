@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { getQueryClient } from "../utils/query_client.ts";
-import { useMe, useLogout } from "../services/auth/hooks.ts";
+import { useLogout, useMe } from "../services/auth/hooks.ts";
 import {
   useCreatePost,
   useDeletePost,
@@ -30,7 +30,13 @@ const RECOVERY_KEY = "soliloquio_editor_recovery";
 function WorkspaceInner() {
   const { data: user, isLoading: authLoading } = useMe();
   const logout = useLogout();
-  const { data: posts, isLoading: postsLoading } = usePosts();
+  const {
+    data: postsData,
+    isLoading: _postsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = usePosts();
   const createPost = useCreatePost();
   const updatePost = useUpdatePost();
   const deletePost = useDeletePost();
@@ -45,8 +51,10 @@ function WorkspaceInner() {
 
   // Sync posts query → signal
   useEffect(() => {
-    if (posts) postsSignal.value = posts;
-  }, [posts]);
+    if (postsData) {
+      postsSignal.value = postsData.pages.flatMap((p) => p.nodes);
+    }
+  }, [postsData]);
 
   // Check localStorage recovery on mount
   useEffect(() => {
@@ -95,7 +103,11 @@ function WorkspaceInner() {
         content: buf.markdownContent,
         isPublished: buf.isPublished,
       },
-      { onSuccess: (data) => { if ("id" in data) markBufferClean(); } },
+      {
+        onSuccess: (data) => {
+          if ("id" in data) markBufferClean();
+        },
+      },
     );
   }, []);
 
@@ -195,14 +207,16 @@ function WorkspaceInner() {
         onSelectPost={handleSelectPost}
         onNewPost={handleNewPost}
         isCreating={createPost.isPending}
+        onLoadMore={() => fetchNextPage()}
+        hasNextPage={!!hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
       />
       <EditorPane
         editorBuffer={editorBuffer.value}
         isPreviewToggled={isPreviewToggled.value}
         activePost={activePost.value}
         onBufferChange={handleBufferChange}
-        onTogglePreview={() =>
-          isPreviewToggled.value = !isPreviewToggled.value}
+        onTogglePreview={() => isPreviewToggled.value = !isPreviewToggled.value}
         onTogglePublish={() =>
           handleBufferChange({
             isPublished: !editorBuffer.value.isPublished,
