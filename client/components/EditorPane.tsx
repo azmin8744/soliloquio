@@ -69,9 +69,7 @@ export function EditorPane({
 
         <div class="flex-1" />
 
-        {isDirty && (
-          <span class="text-xs text-amber-600">Unsaved changes</span>
-        )}
+        {isDirty && <span class="text-xs text-amber-600">Unsaved changes</span>}
 
         <button
           onClick={onSave}
