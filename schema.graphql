@@ -55,6 +55,28 @@ ISO 8601 combined date and time without timezone.
 """
 scalar NaiveDateTime
 
+"""
+Information about pagination in a connection
+"""
+type PageInfo {
+	"""
+	When paginating backwards, are there more items?
+	"""
+	hasPreviousPage: Boolean!
+	"""
+	When paginating forwards, are there more items?
+	"""
+	hasNextPage: Boolean!
+	"""
+	When paginating backwards, the cursor to continue.
+	"""
+	startCursor: String
+	"""
+	When paginating forwards, the cursor to continue.
+	"""
+	endCursor: String
+}
+
 type PasswordChangeSuccess {
 	message: String!
 }
@@ -64,8 +86,8 @@ type Post {
 	title: String!
 	isPublished: Boolean!
 	firstPublishedAt: NaiveDateTime
-	createdAt: NaiveDateTime
-	updatedAt: NaiveDateTime
+	createdAt: NaiveDateTime!
+	updatedAt: NaiveDateTime!
 	"""
 	Returns the original markdown content for editing
 	"""
@@ -76,6 +98,35 @@ type Post {
 	content: String!
 }
 
+type PostConnection {
+	"""
+	Information to aid in pagination.
+	"""
+	pageInfo: PageInfo!
+	"""
+	A list of edges.
+	"""
+	edges: [PostEdge!]!
+	"""
+	A list of nodes.
+	"""
+	nodes: [Post!]!
+}
+
+"""
+An edge in a connection.
+"""
+type PostEdge {
+	"""
+	The item at the end of the edge
+	"""
+	node: Post!
+	"""
+	A cursor for use in pagination
+	"""
+	cursor: String!
+}
+
 union PostMutationResult = Post | DeletedPost | DbError | AuthError
 
 type Queries {
@@ -84,9 +135,9 @@ type Queries {
 	"""
 	me: User
 	"""
-	Get all posts for the authenticated user
+	Get paginated posts for the authenticated user
 	"""
-	posts: [Post!]!
+	posts(after: String, first: Int): PostConnection!
 	"""
 	Get a specific post by ID for the authenticated user
 	"""
