@@ -3,6 +3,7 @@ import { getGraphQLClient } from "../../utils/graphql_client.ts";
 import {
   AddPostInput,
   DeletePostInput,
+  PostConnection,
   PostMutationResult,
   UpdatePostInput,
 } from "./types.ts";
@@ -70,15 +71,21 @@ const DELETE_POST_MUTATION = `
 `;
 
 const GET_POSTS_QUERY = `
-  query GetPosts {
-    posts {
-      id
-      title
-      isPublished
-      createdAt
-      updatedAt
-      markdownContent
-      content
+  query GetPosts($after: String, $first: Int) {
+    posts(after: $after, first: $first) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        id
+        title
+        isPublished
+        createdAt
+        updatedAt
+        markdownContent
+        content
+      }
     }
   }
 `;
@@ -130,9 +137,14 @@ export async function deletePost(
   return data.deletePost;
 }
 
-export async function getPosts(): Promise<Post[]> {
+export async function getPosts(
+  { after, first }: { after?: string; first?: number } = {},
+): Promise<PostConnection> {
   const client = getGraphQLClient();
-  const data = await client.request<{ posts: Post[] }>(GET_POSTS_QUERY);
+  const data = await client.request<{ posts: PostConnection }>(
+    GET_POSTS_QUERY,
+    { after, first },
+  );
   return data.posts;
 }
 

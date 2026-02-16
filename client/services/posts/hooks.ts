@@ -1,15 +1,30 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { addPost, deletePost, getPost, getPosts, updatePost } from "./api.ts";
-import { AddPostInput, DeletePostInput, UpdatePostInput } from "./types.ts";
+import {
+  AddPostInput,
+  DeletePostInput,
+  PostConnection,
+  UpdatePostInput,
+} from "./types.ts";
 import { postKeys } from "./keys.ts";
 import { UUID } from "../../domains/common.ts";
 
 export function usePosts() {
-  return useQuery({
+  return useInfiniteQuery<PostConnection>({
     queryKey: postKeys.lists(),
-    queryFn: async () => {
-      return await getPosts();
+    queryFn: async ({ pageParam }) => {
+      return await getPosts({ after: pageParam as string | undefined });
     },
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.pageInfo.hasNextPage
+        ? lastPage.pageInfo.endCursor ?? undefined
+        : undefined,
   });
 }
 
