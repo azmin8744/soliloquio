@@ -5,8 +5,8 @@ create table posts (
     user_id uuid not null,
     is_published boolean default false not null,
     first_published_at timestamp,
-    created_at timestamp default current_timestamp,
-    updated_at timestamp default current_timestamp
+    created_at timestamp default current_timestamp not null,
+    updated_at timestamp default current_timestamp not null
 );
 
 create table users (
@@ -33,3 +33,5 @@ create index idx_refresh_tokens_token_hash on refresh_tokens(token_hash);
 create index idx_refresh_tokens_expires_at on refresh_tokens(expires_at);
 
 alter table posts add constraint fk_user_id foreign key (user_id) references users (id);
+
+create index idx_posts_user_pagination on posts (user_id, created_at desc, id desc);

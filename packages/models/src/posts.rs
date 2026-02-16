@@ -12,8 +12,8 @@ pub struct Model {
     pub user_id: Uuid,
     pub is_published: bool,
     pub first_published_at: Option<DateTime>,
-    pub created_at: Option<DateTime>,
-    pub updated_at: Option<DateTime>,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
     #[sea_orm(column_type = "Text", nullable)]
     pub markdown_content: Option<String>,
 }

@@ -97,8 +97,8 @@ pub async fn create_test_post(
         user_id: ActiveValue::Set(user_id),
         is_published: ActiveValue::Set(is_published),
         first_published_at: ActiveValue::Set(first_published_at),
-        created_at: ActiveValue::Set(Some(chrono::Utc::now().naive_utc())),
-        updated_at: ActiveValue::Set(None),
+        created_at: ActiveValue::Set(chrono::Utc::now().naive_utc()),
+        updated_at: ActiveValue::Set(chrono::Utc::now().naive_utc()),
     };
 
     post.insert(db).await.expect("Failed to create test post")
@@ -121,9 +121,7 @@ pub fn create_expired_access_token(user: &models::users::Model) -> String {
     dotenvy::dotenv().ok();
     let secret = std::env::var("TOKEN_SECRET").unwrap_or_else(|_| "secret".to_string());
 
-    let expiration = Utc::now()
-        .checked_sub_signed(Duration::hours(1))
-        .unwrap();
+    let expiration = Utc::now().checked_sub_signed(Duration::hours(1)).unwrap();
 
     let claims = Claims {
         iss: "localhost".to_string(),
