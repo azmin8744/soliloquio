@@ -1,8 +1,8 @@
-use sea_orm::*;
-use chrono::Utc;
-use uuid::Uuid;
-use models::refresh_tokens::{self, Entity as RefreshTokens, Model as RefreshToken};
 use super::token::{generate_refresh_token, hash_token, AuthError, Token};
+use chrono::Utc;
+use models::refresh_tokens::{self, Entity as RefreshTokens, Model as RefreshToken};
+use sea_orm::*;
+use uuid::Uuid;
 
 /// Create a new refresh token and store it in the database
 pub async fn create_refresh_token(
@@ -36,39 +36,43 @@ pub async fn validate_refresh_token(
     let now = Utc::now().naive_utc();
 
     // Find the refresh token by hash and ensure it's not expired
-    let refresh_token = RefreshTokens::find()
+    let refresh_token = match RefreshTokens::find()
         .filter(refresh_tokens::Column::TokenHash.eq(token_hash))
         .filter(refresh_tokens::Column::ExpiresAt.gt(now))
         .one(db)
         .await
         .map_err(|e| AuthError { message: e.to_string() })?
-        .ok_or(AuthError {
-            message: "Invalid or expired refresh token".to_string(),
-        })?;
+    {
+        Some(rt) => rt,
+        None => {
+            tracing::warn!("invalid or expired refresh token");
+            return Err(AuthError {
+                message: "Invalid or expired refresh token".to_string(),
+            });
+        }
+    };
 
     // Update last_used_at timestamp
     let mut active_model = refresh_token.clone().into_active_model();
     active_model.last_used_at = ActiveValue::set(Some(now));
-    active_model
-        .update(db)
-        .await
-        .map_err(|e| AuthError { message: e.to_string() })?;
+    active_model.update(db).await.map_err(|e| AuthError {
+        message: e.to_string(),
+    })?;
 
     Ok(refresh_token)
 }
 
 /// Revoke a specific refresh token
-pub async fn revoke_refresh_token(
-    db: &DatabaseConnection,
-    token: &str,
-) -> Result<(), AuthError> {
+pub async fn revoke_refresh_token(db: &DatabaseConnection, token: &str) -> Result<(), AuthError> {
     let token_hash = hash_token(token);
 
     RefreshTokens::delete_many()
         .filter(refresh_tokens::Column::TokenHash.eq(token_hash))
         .exec(db)
         .await
-        .map_err(|e| AuthError { message: e.to_string() })?;
+        .map_err(|e| AuthError {
+            message: e.to_string(),
+        })?;
 
     Ok(())
 }
@@ -82,7 +86,9 @@ pub async fn revoke_all_refresh_tokens(
         .filter(refresh_tokens::Column::UserId.eq(user_id))
         .exec(db)
         .await
-        .map_err(|e| AuthError { message: e.to_string() })?;
+        .map_err(|e| AuthError {
+            message: e.to_string(),
+        })?;
 
     Ok(())
 }
@@ -96,6 +102,9 @@ pub async fn cleanup_expired_tokens(db: &DatabaseConnection) -> Result<u64, DbEr
         .exec(db)
         .await?;
 
+    if result.rows_affected > 0 {
+        tracing::debug!(count = result.rows_affected, "cleaned up expired tokens");
+    }
     Ok(result.rows_affected)
 }
 

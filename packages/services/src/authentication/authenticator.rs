@@ -1,7 +1,7 @@
 use crate::authentication::token::Token;
-use std::fmt;
+use models::users::{Entity as users, Model};
 use sea_orm::*;
-use models::users::{Model, Entity as users};
+use std::fmt;
 
 #[derive(Debug)]
 pub struct BadCredentialsError {
@@ -45,15 +45,24 @@ impl fmt::Display for AuthenticationError {
 }
 
 pub async fn get_user(db: &DatabaseConnection, token: &Token) -> Result<Model, AuthenticationError> {
-    let user_id = token.get_user_id()?;
+    let user_id = match token.get_user_id() {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::warn!("invalid token");
+            return Err(e.into());
+        }
+    };
 
     let user = users::find_by_id(user_id).one(db).await?;
-    if user.is_none() {
-        return Err(AuthenticationError::BadCredentials(BadCredentialsError {
-            message: "User not found".to_string(),
-        }));
+    match user {
+        Some(u) => Ok(u),
+        None => {
+            tracing::warn!(user_id = %user_id, "user not found by token");
+            Err(AuthenticationError::BadCredentials(BadCredentialsError {
+                message: "User not found".to_string(),
+            }))
+        }
     }
-    Ok(user.unwrap())
 }
 
 #[cfg(test)]

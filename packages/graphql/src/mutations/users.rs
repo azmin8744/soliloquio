@@ -1,23 +1,21 @@
+use crate::errors::{AuthError, DbError, ValidationErrorType};
+use crate::mutations::input_validators::{ChangePasswordInput, SignInInput, SignUpInput};
+use crate::types::authorized_user::AuthorizedUser;
+use crate::utilities::requires_auth::RequiresAuth;
+use actix_web::cookie::{Cookie, SameSite};
+use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
+};
 use async_graphql::{Context, Object, Result, SimpleObject, Union};
-use sea_orm::*;
 use models::{prelude::*, *};
 use sea_orm::entity::prelude::Uuid;
-use argon2::{
-    password_hash::{
-        rand_core::OsRng,
-        PasswordHash, PasswordHasher, PasswordVerifier, SaltString
-    },
-    Argon2
-};
-use actix_web::cookie::{Cookie, SameSite};
-use crate::types::authorized_user::AuthorizedUser;
-use crate::errors::{DbError, AuthError, ValidationErrorType};
-use crate::utilities::requires_auth::RequiresAuth;
-use crate::mutations::input_validators::{SignUpInput, SignInInput, ChangePasswordInput};
-use services::authentication::token::{Token, generate_token};
+use sea_orm::*;
 use services::authentication::refresh_token::{
-    create_refresh_token, validate_refresh_token, revoke_refresh_token, revoke_all_refresh_tokens, cleanup_expired_tokens
+    cleanup_expired_tokens, create_refresh_token, revoke_all_refresh_tokens, revoke_refresh_token,
+    validate_refresh_token,
 };
+use services::authentication::token::{generate_token, Token};
 use services::validation::input_validator::InputValidator;
 
 #[derive(SimpleObject)]
@@ -35,7 +33,9 @@ pub enum UserMutationResult {
 }
 
 // Helper function to convert validation errors to GraphQL response
-fn validation_errors_to_message(errors: services::validation::input_validator::ValidationErrors) -> String {
+fn validation_errors_to_message(
+    errors: services::validation::input_validator::ValidationErrors,
+) -> String {
     errors
         .values()
         .flatten()
@@ -52,34 +52,48 @@ impl RequiresAuth for UserMutation {}
 trait UserMutations {
     async fn sign_up(&self, ctx: &Context<'_>, input: SignUpInput) -> Result<UserMutationResult>;
     async fn sign_in(&self, ctx: &Context<'_>, input: SignInInput) -> Result<UserMutationResult>;
-    async fn refresh_access_token(&self, ctx: &Context<'_>, refresh_token: String) -> Result<UserMutationResult>;
-    async fn change_password(&self, ctx: &Context<'_>, input: ChangePasswordInput) -> Result<UserMutationResult>;
+    async fn refresh_access_token(
+        &self,
+        ctx: &Context<'_>,
+        refresh_token: String,
+    ) -> Result<UserMutationResult>;
+    async fn change_password(
+        &self,
+        ctx: &Context<'_>,
+        input: ChangePasswordInput,
+    ) -> Result<UserMutationResult>;
     async fn logout(&self, ctx: &Context<'_>, refresh_token: String) -> Result<bool, AuthError>;
-    async fn logout_all_devices(&self, ctx: &Context<'_>, access_token: String) -> Result<bool, AuthError>;
+    async fn logout_all_devices(
+        &self,
+        ctx: &Context<'_>,
+        access_token: String,
+    ) -> Result<bool, AuthError>;
 }
 
 #[Object]
 impl UserMutations for UserMutation {
     async fn sign_up(&self, ctx: &Context<'_>, input: SignUpInput) -> Result<UserMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
-        
+
         // Validate input
         if let Err(validation_errors) = input.validate() {
             return Ok(UserMutationResult::ValidationError(ValidationErrorType {
                 message: validation_errors_to_message(validation_errors),
             }));
         }
-        
+
         // Hash password
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
         let password_hash = match argon2.hash_password(&input.password.into_bytes(), &salt) {
             Ok(hash) => hash.to_string(),
-            Err(_) => return Ok(UserMutationResult::AuthError(AuthError {
-                message: "Failed to hash password".to_string()
-            })),
+            Err(_) => {
+                return Ok(UserMutationResult::AuthError(AuthError {
+                    message: "Failed to hash password".to_string(),
+                }))
+            }
         };
-        
+
         // Create user
         let user = users::ActiveModel {
             id: ActiveValue::set(Uuid::new_v4()),
@@ -87,26 +101,31 @@ impl UserMutations for UserMutation {
             password: ActiveValue::set(password_hash),
             ..Default::default()
         };
-        
+
         let res = match user.insert(db).await {
             Ok(user) => user,
-            Err(e) => return Ok(UserMutationResult::DbError(DbError {
-                message: e.to_string()
-            })),
+            Err(e) => {
+                tracing::warn!("signup DB error");
+                return Ok(UserMutationResult::DbError(DbError {
+                    message: e.to_string()
+                }));
+            }
         };
 
         // Create refresh token
         let refresh_token = match create_refresh_token(db, res.id, None).await {
             Ok(token) => token,
-            Err(e) => return Ok(UserMutationResult::AuthError(AuthError {
-                message: e.to_string()
-            })),
+            Err(e) => {
+                return Ok(UserMutationResult::AuthError(AuthError {
+                    message: e.to_string(),
+                }))
+            }
         };
 
         let _ = cleanup_expired_tokens(db).await;
 
         let access_token = generate_token(&res);
-        
+
         // Set httpOnly cookies for both access and refresh tokens
         let access_cookie = Cookie::build("access_token", &access_token)
             .http_only(true)
@@ -128,6 +147,7 @@ impl UserMutations for UserMutation {
         ctx.insert_http_header("Set-Cookie", access_cookie.to_string());
         ctx.append_http_header("Set-Cookie", refresh_cookie.to_string());
 
+        tracing::info!(user_id = %res.id, "signup success");
         Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
             token: access_token,
             refresh_token,
@@ -136,24 +156,27 @@ impl UserMutations for UserMutation {
 
     async fn sign_in(&self, ctx: &Context<'_>, input: SignInInput) -> Result<UserMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
-        
+
         // Validate input
         if let Err(validation_errors) = input.validate() {
             return Ok(UserMutationResult::ValidationError(ValidationErrorType {
                 message: validation_errors_to_message(validation_errors),
             }));
         }
-        
+
         // Find user
         let user = match Users::find()
             .filter(users::Column::Email.contains(&input.email))
             .one(db)
-            .await 
+            .await
         {
             Ok(Some(user)) => user,
-            Ok(None) => return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
-                message: "Email or password incorrect".to_string() 
-            })),
+            Ok(None) => {
+                tracing::warn!("signin failed: email not found");
+                return Ok(UserMutationResult::ValidationError(ValidationErrorType {
+                    message: "Email or password incorrect".to_string()
+                }));
+            }
             Err(e) => return Ok(UserMutationResult::DbError(DbError {
                 message: e.to_string()
             })),
@@ -162,29 +185,34 @@ impl UserMutations for UserMutation {
         // Verify password
         let parsed_hash = match PasswordHash::new(&user.password) {
             Ok(hash) => hash,
-            Err(_) => return Ok(UserMutationResult::AuthError(AuthError { 
-                message: "Invalid password hash in database".to_string() 
-            })),
+            Err(_) => {
+                return Ok(UserMutationResult::AuthError(AuthError {
+                    message: "Invalid password hash in database".to_string(),
+                }))
+            }
         };
 
         if Argon2::default().verify_password(&input.password.into_bytes(), &parsed_hash).is_err() {
-            return Ok(UserMutationResult::ValidationError(ValidationErrorType { 
-                message: "Email or password incorrect".to_string() 
+            tracing::warn!("signin failed: wrong password");
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType {
+                message: "Email or password incorrect".to_string()
             }));
         }
 
         // Create refresh token and return success
         let refresh_token = match create_refresh_token(db, user.id, None).await {
             Ok(token) => token,
-            Err(e) => return Ok(UserMutationResult::AuthError(AuthError {
-                message: e.to_string()
-            })),
+            Err(e) => {
+                return Ok(UserMutationResult::AuthError(AuthError {
+                    message: e.to_string(),
+                }))
+            }
         };
 
         let _ = cleanup_expired_tokens(db).await;
-        
+
         let access_token = generate_token(&user);
-        
+
         // Set httpOnly cookies for both access and refresh tokens
         let access_cookie = Cookie::build("access_token", &access_token)
             .http_only(true)
@@ -206,33 +234,48 @@ impl UserMutations for UserMutation {
         ctx.insert_http_header("Set-Cookie", access_cookie.to_string());
         ctx.append_http_header("Set-Cookie", refresh_cookie.to_string());
         
+        tracing::info!(user_id = %user.id, "signin success");
         Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
             token: access_token,
             refresh_token,
         }))
     }
 
-    async fn refresh_access_token(&self, ctx: &Context<'_>, refresh_token: String) -> Result<UserMutationResult> {
+    async fn refresh_access_token(
+        &self,
+        ctx: &Context<'_>,
+        refresh_token: String,
+    ) -> Result<UserMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
         // Validate the refresh token and get the refresh token record
         let refresh_token_record = match validate_refresh_token(db, &refresh_token).await {
             Ok(record) => record,
-            Err(e) => return Ok(UserMutationResult::AuthError(AuthError {
-                message: e.message
-            })),
+            Err(e) => {
+                return Ok(UserMutationResult::AuthError(AuthError {
+                    message: e.message,
+                }))
+            }
         };
 
         // Get the user associated with this refresh token
-        let user = match services::authentication::authenticator::get_user(db, &Token::new(refresh_token.clone())).await {
+        let user = match services::authentication::authenticator::get_user(
+            db,
+            &Token::new(refresh_token.clone()),
+        )
+        .await
+        {
             Ok(user) => user,
-            Err(e) => return Ok(UserMutationResult::AuthError(AuthError {
-                message: e.to_string()
-            })),
+            Err(e) => {
+                return Ok(UserMutationResult::AuthError(AuthError {
+                    message: e.to_string(),
+                }))
+            }
         };
 
         // Ensure the token belongs to the correct user (extra security check)
         if refresh_token_record.user_id != user.id {
+            tracing::warn!("refresh token user_id mismatch");
             return Ok(UserMutationResult::AuthError(AuthError {
                 message: "Refresh token does not belong to the authenticated user".to_string(),
             }));
@@ -265,7 +308,8 @@ impl UserMutations for UserMutation {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
         // Revoke the specific refresh token
-        revoke_refresh_token(db, &refresh_token).await
+        revoke_refresh_token(db, &refresh_token)
+            .await
             .map_err(|e| AuthError { message: e.message })?;
 
         // Clear cookies by setting expired ones
@@ -288,13 +332,19 @@ impl UserMutations for UserMutation {
         ctx.insert_http_header("Set-Cookie", expired_access.to_string());
         ctx.append_http_header("Set-Cookie", expired_refresh.to_string());
 
+        tracing::info!("logout");
+
         // Opportunistic cleanup of expired tokens
         let _ = cleanup_expired_tokens(db).await;
 
         Ok(true)
     }
 
-    async fn logout_all_devices(&self, ctx: &Context<'_>, access_token: String) -> Result<bool, AuthError> {
+    async fn logout_all_devices(
+        &self,
+        ctx: &Context<'_>,
+        access_token: String,
+    ) -> Result<bool, AuthError> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
         // Get user from access token
@@ -302,7 +352,8 @@ impl UserMutations for UserMutation {
         let user = services::authentication::authenticator::get_user(db, &token).await?;
 
         // Revoke all refresh tokens for this user
-        revoke_all_refresh_tokens(db, user.id).await
+        revoke_all_refresh_tokens(db, user.id)
+            .await
             .map_err(|e| AuthError { message: e.message })?;
 
         // Opportunistic cleanup of expired tokens
@@ -311,7 +362,11 @@ impl UserMutations for UserMutation {
         Ok(true)
     }
 
-    async fn change_password(&self, ctx: &Context<'_>, input: ChangePasswordInput) -> Result<UserMutationResult> {
+    async fn change_password(
+        &self,
+        ctx: &Context<'_>,
+        input: ChangePasswordInput,
+    ) -> Result<UserMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
         // 1. Authenticate user
@@ -378,7 +433,8 @@ impl UserMutations for UserMutation {
         // 6. Hash new password
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
-        let new_password_hash = match argon2.hash_password(&input.new_password.into_bytes(), &salt) {
+        let new_password_hash = match argon2.hash_password(&input.new_password.into_bytes(), &salt)
+        {
             Ok(hash) => hash.to_string(),
             Err(_) => {
                 return Ok(UserMutationResult::AuthError(AuthError {
@@ -394,7 +450,7 @@ impl UserMutations for UserMutation {
         user_to_update.updated_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
 
         match Users::update(user_to_update).exec(db).await {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(e) => {
                 return Ok(UserMutationResult::DbError(DbError {
                     message: e.to_string(),
@@ -406,15 +462,15 @@ impl UserMutations for UserMutation {
         // This forces re-authentication on all other devices
         match revoke_all_refresh_tokens(db, user_id).await {
             Ok(_) => {},
-            Err(e) => {
-                // Log error but don't fail the password change
-                eprintln!("Warning: Failed to revoke refresh tokens: {}", e.message);
+            Err(_e) => {
+                tracing::warn!("failed to revoke refresh tokens on password change");
             }
         }
 
         // 9. Cleanup expired tokens
         let _ = cleanup_expired_tokens(db).await;
 
+        tracing::info!(user_id = %user_id, "password changed");
         Ok(UserMutationResult::PasswordChangeSuccess(PasswordChangeSuccess {
             message: "Password changed successfully. Please sign in again on other devices.".to_string(),
         }))
@@ -788,7 +844,6 @@ mod tests {
         let signin_res = schema.execute(Request::new(&signin_query)).await;
         let signin_data = signin_res.data.into_json().unwrap();
         let refresh_token = signin_data["signIn"]["refreshToken"].as_str().unwrap();
-        let original_token = signin_data["signIn"]["token"].as_str().unwrap();
 
         // Refresh
         let refresh_query = format!(
@@ -884,7 +939,10 @@ mod tests {
         let signin_data = signin_res.data.into_json().unwrap();
         let refresh_token = signin_data["signIn"]["refreshToken"].as_str().unwrap();
 
-        let logout_query = format!(r#"mutation {{ logout(refreshToken: "{}") }}"#, refresh_token);
+        let logout_query = format!(
+            r#"mutation {{ logout(refreshToken: "{}") }}"#,
+            refresh_token
+        );
 
         let res = schema.execute(Request::new(&logout_query)).await;
         assert!(res.errors.is_empty());
@@ -903,7 +961,9 @@ mod tests {
 
         let refresh_res = schema.execute(Request::new(&refresh_query)).await;
         let refresh_data = refresh_res.data.into_json().unwrap();
-        assert!(refresh_data["refreshAccessToken"]["message"].as_str().is_some());
+        assert!(refresh_data["refreshAccessToken"]["message"]
+            .as_str()
+            .is_some());
 
         cleanup_test_user_by_email(&db, &email).await;
     }

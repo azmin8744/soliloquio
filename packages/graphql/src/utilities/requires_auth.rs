@@ -1,6 +1,6 @@
-use std::fmt;
-use services::authentication::token::Token;
 use async_graphql::{Context, Result};
+use services::authentication::token::Token;
+use std::fmt;
 
 #[derive(Debug)]
 pub struct AuthenticationError {
@@ -9,7 +9,9 @@ pub struct AuthenticationError {
 
 impl From<services::authentication::authenticator::AuthenticationError> for AuthenticationError {
     fn from(e: services::authentication::authenticator::AuthenticationError) -> Self {
-        AuthenticationError { message: e.to_string() }
+        AuthenticationError {
+            message: e.to_string(),
+        }
     }
 }
 impl fmt::Display for AuthenticationError {
@@ -19,10 +21,14 @@ impl fmt::Display for AuthenticationError {
 }
 
 pub trait RequiresAuth {
-    async fn require_authenticate_as_user<'a>(&self, ctx: &Context<'a>) -> Result<models::users::Model, AuthenticationError> {
+    async fn require_authenticate_as_user<'a>(
+        &self,
+        ctx: &Context<'a>,
+    ) -> Result<models::users::Model, AuthenticationError> {
         let token = match ctx.data::<Token>() {
             Ok(token) => token,
             Err(_) => {
+                tracing::debug!("missing auth token");
                 return Err(AuthenticationError {
                     message: "Token not found".to_string(),
                 });
@@ -53,7 +59,7 @@ mod tests {
         let token = create_access_token(&user);
 
         // posts query requires auth - if it works, auth succeeded
-        let query = r#"query { posts { id } }"#;
+        let query = r#"query { posts { edges { node { id } } } }"#;
 
         let res = schema
             .execute(Request::new(query).data(Token::new(token)))
@@ -68,7 +74,7 @@ mod tests {
         let db = setup_test_db().await;
         let schema = create_test_schema(db.clone());
 
-        let query = r#"query { posts { id } }"#;
+        let query = r#"query { posts { edges { node { id } } } }"#;
 
         let res = schema.execute(Request::new(query)).await;
         assert!(!res.errors.is_empty());
@@ -81,7 +87,7 @@ mod tests {
         let db = setup_test_db().await;
         let schema = create_test_schema(db.clone());
 
-        let query = r#"query { posts { id } }"#;
+        let query = r#"query { posts { edges { node { id } } } }"#;
 
         let res = schema
             .execute(Request::new(query).data(Token::new("invalid.jwt.token".to_string())))
@@ -99,7 +105,7 @@ mod tests {
         // Create an expired token
         let expired_token = create_expired_access_token(&user);
 
-        let query = r#"query { posts { id } }"#;
+        let query = r#"query { posts { edges { node { id } } } }"#;
 
         let res = schema
             .execute(Request::new(query).data(Token::new(expired_token)))
@@ -120,7 +126,7 @@ mod tests {
         // Delete the user
         cleanup_test_user(&db, user.id).await;
 
-        let query = r#"query { posts { id } }"#;
+        let query = r#"query { posts { edges { node { id } } } }"#;
 
         let res = schema
             .execute(Request::new(query).data(Token::new(token)))

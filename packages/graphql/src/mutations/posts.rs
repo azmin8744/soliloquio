@@ -1,10 +1,10 @@
+use crate::errors::{AuthError, DbError};
+use crate::types::post::{DeletedPost, Post as PostType};
+use crate::utilities::requires_auth::RequiresAuth;
 use async_graphql::{Context, InputObject, Object, Result, Union};
-use sea_orm::*;
 use models::{prelude::*, *};
 use sea_orm::entity::prelude::Uuid;
-use crate::types::post::{Post as PostType, DeletedPost};
-use crate::utilities::requires_auth::RequiresAuth;
-use crate::errors::{DbError, AuthError};
+use sea_orm::*;
 
 #[derive(Union)]
 pub enum PostMutationResult {
@@ -17,7 +17,7 @@ pub enum PostMutationResult {
 #[derive(InputObject)]
 struct AddPostInput {
     title: String,
-    content: String,  // This will be the markdown content
+    content: String, // This will be the markdown content
     is_published: Option<bool>,
 }
 
@@ -25,7 +25,7 @@ struct AddPostInput {
 struct UpdatePostInput {
     id: Uuid,
     title: String,
-    content: String,  // This will be the markdown content
+    content: String, // This will be the markdown content
     is_published: Option<bool>,
 }
 
@@ -38,16 +38,32 @@ struct DeletePostInput {
 pub struct PostMutation;
 
 trait PostMutations {
-    async fn add_post(&self, ctx: &Context<'_>, new_post: AddPostInput) -> Result<PostMutationResult>;
-    async fn update_post(&self, ctx: &Context<'_>, post: UpdatePostInput) -> Result<PostMutationResult>;
-    async fn delete_post(&self, ctx: &Context<'_>, post: DeletePostInput) -> Result<PostMutationResult>;
+    async fn add_post(
+        &self,
+        ctx: &Context<'_>,
+        new_post: AddPostInput,
+    ) -> Result<PostMutationResult>;
+    async fn update_post(
+        &self,
+        ctx: &Context<'_>,
+        post: UpdatePostInput,
+    ) -> Result<PostMutationResult>;
+    async fn delete_post(
+        &self,
+        ctx: &Context<'_>,
+        post: DeletePostInput,
+    ) -> Result<PostMutationResult>;
 }
 
 impl RequiresAuth for PostMutation {}
 
 #[Object]
 impl PostMutations for PostMutation {
-    async fn add_post(&self, ctx: &Context<'_>, new_post: AddPostInput) -> Result<PostMutationResult> {
+    async fn add_post(
+        &self,
+        ctx: &Context<'_>,
+        new_post: AddPostInput,
+    ) -> Result<PostMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
         let user = match self.require_authenticate_as_user(ctx).await {
@@ -60,12 +76,12 @@ impl PostMutations for PostMutation {
         };
 
         let is_published = new_post.is_published.unwrap_or(false);
-        let first_published_at = if is_published { 
+        let first_published_at = if is_published {
             Some(chrono::Utc::now().naive_utc())
         } else {
             None
         };
-        
+
         let post = posts::ActiveModel {
             id: ActiveValue::set(Uuid::new_v4()),
             title: ActiveValue::set(new_post.title),
@@ -79,12 +95,13 @@ impl PostMutations for PostMutation {
         let res = match Posts::insert(post).exec(db).await {
             Ok(res) => res,
             Err(e) => {
+                tracing::error!("failed to insert post");
                 return Ok(PostMutationResult::DbError(DbError {
                     message: e.to_string(),
                 }));
             }
         };
-        
+
         let p = match Posts::find_by_id(res.last_insert_id).one(db).await {
             Ok(Some(p)) => p,
             Ok(None) => {
@@ -110,7 +127,11 @@ impl PostMutations for PostMutation {
         }))
     }
 
-    async fn update_post(&self, ctx: &Context<'_>, post: UpdatePostInput) -> Result<PostMutationResult> {
+    async fn update_post(
+        &self,
+        ctx: &Context<'_>,
+        post: UpdatePostInput,
+    ) -> Result<PostMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
         let user = match self.require_authenticate_as_user(ctx).await {
@@ -124,7 +145,9 @@ impl PostMutations for PostMutation {
 
         let mut post_to_update = match Posts::find_by_id(post.id)
             .filter(models::posts::Column::UserId.eq(user.id))
-            .one(db).await {
+            .one(db)
+            .await
+        {
             Ok(Some(p)) => p.into_active_model(),
             Ok(None) => {
                 return Ok(PostMutationResult::DbError(DbError {
@@ -140,22 +163,23 @@ impl PostMutations for PostMutation {
 
         post_to_update.title = ActiveValue::set(post.title);
         post_to_update.markdown_content = ActiveValue::set(Some(post.content));
-        post_to_update.updated_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
-        
+        post_to_update.updated_at = ActiveValue::set(chrono::Utc::now().naive_utc());
+
         // Invalidate cache for this post
         if let Ok(cache) = ctx.data::<crate::utilities::MarkdownCache>() {
             cache.invalidate(&post.id);
         }
-        
+
         // Handle publication status change if provided
         if let Some(is_published) = post.is_published {
             post_to_update.is_published = ActiveValue::set(is_published);
-            
+
             // Set first_published_at if being published for the first time
             if is_published {
                 let post_model = Posts::find_by_id(post.id).one(db).await.unwrap().unwrap();
                 if post_model.first_published_at.is_none() {
-                    post_to_update.first_published_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
+                    post_to_update.first_published_at =
+                        ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
                 }
             }
         }
@@ -171,7 +195,7 @@ impl PostMutations for PostMutation {
                     created_at: p.created_at,
                     updated_at: p.updated_at,
                 }))
-            },
+            }
             Err(e) => {
                 return Ok(PostMutationResult::DbError(DbError {
                     message: e.to_string(),
@@ -180,7 +204,11 @@ impl PostMutations for PostMutation {
         };
     }
 
-    async fn delete_post(&self, ctx: &Context<'_>, post: DeletePostInput) -> Result<PostMutationResult> {
+    async fn delete_post(
+        &self,
+        ctx: &Context<'_>,
+        post: DeletePostInput,
+    ) -> Result<PostMutationResult> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
         let user = match self.require_authenticate_as_user(ctx).await {
@@ -194,7 +222,9 @@ impl PostMutations for PostMutation {
 
         let post_to_delete = match Posts::find_by_id(post.id)
             .filter(models::posts::Column::UserId.eq(user.id))
-            .one(db).await {
+            .one(db)
+            .await
+        {
             Ok(Some(p)) => p.into_active_model(),
             Ok(None) => {
                 return Ok(PostMutationResult::DbError(DbError {
@@ -209,7 +239,9 @@ impl PostMutations for PostMutation {
         };
 
         match Posts::delete(post_to_delete.clone()).exec(db).await {
-            Ok(_) => Ok(PostMutationResult::DeletedPost(DeletedPost { id: post_to_delete.id.unwrap() })),
+            Ok(_) => Ok(PostMutationResult::DeletedPost(DeletedPost {
+                id: post_to_delete.id.unwrap(),
+            })),
             Err(e) => Ok(PostMutationResult::DbError(DbError {
                 message: e.to_string(),
             })),
@@ -477,8 +509,6 @@ mod tests {
         let user = create_test_user_with_password(&db, &email, &valid_password()).await;
         let token = create_access_token(&user);
         let post = create_test_post(&db, user.id, "Title", "content", false).await;
-
-        assert!(post.updated_at.is_none());
 
         let query = format!(
             r#"mutation {{
