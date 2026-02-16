@@ -1,17 +1,15 @@
-use actix_web::{
-    guard, web, App, HttpRequest, HttpResponse, HttpServer, Result,
-};
 use actix_cors::Cors;
+use actix_web::{guard, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use async_graphql::{http::GraphiQLSource, Schema};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 use tracing_actix_web::TracingLogger;
 mod setup;
-use setup::set_up_db;
-use graphql::queries::Queries as QueryRoot;
 use graphql::mutations::Mutations as MutationRoot;
-use graphql::subscriptions::{Subscriptions as SubscriptionRoot, on_connection_init};
+use graphql::queries::Queries as QueryRoot;
+use graphql::subscriptions::{on_connection_init, Subscriptions as SubscriptionRoot};
 use graphql::utilities::MarkdownCache;
 use services::authentication::Token;
+use setup::set_up_db;
 
 type SchemaType = Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 
@@ -22,7 +20,7 @@ fn get_token_from_request(req: &HttpRequest) -> Option<Token> {
             return Some(Token(auth_str.to_string()));
         }
     }
-    
+
     // Then check for access_token cookie
     if let Some(cookie_header) = req.headers().get("cookie") {
         if let Ok(cookie_str) = cookie_header.to_str() {
@@ -36,7 +34,7 @@ fn get_token_from_request(req: &HttpRequest) -> Option<Token> {
             }
         }
     }
-    
+
     None
 }
 
@@ -97,7 +95,11 @@ async fn main() -> std::io::Result<()> {
 
     let markdown_cache = MarkdownCache::new();
 
-    let schema = Schema::build(QueryRoot::default(), MutationRoot::default(), SubscriptionRoot)
+    let schema = Schema::build(
+        QueryRoot::default(),
+        MutationRoot::default(),
+        SubscriptionRoot,
+    )
     .data(db) // Add the database connection to the GraphQL global context
     .data(markdown_cache) // Add the markdown cache to the GraphQL global context
     .finish();
@@ -112,7 +114,7 @@ async fn main() -> std::io::Result<()> {
                     .allowed_origin("http://localhost:8001")
                     .allowed_methods(vec!["GET", "POST"])
                     .allowed_headers(vec!["content-type", "authorization"])
-                    .supports_credentials()
+                    .supports_credentials(),
             )
             .app_data(web::Data::new(schema.clone()))
             .service(web::resource("/").guard(guard::Get()).to(graphiql))

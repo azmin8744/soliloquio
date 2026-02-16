@@ -1,7 +1,7 @@
 use crate::authentication::token::Token;
-use std::fmt;
+use models::users::{Entity as users, Model};
 use sea_orm::*;
-use models::users::{Model, Entity as users};
+use std::fmt;
 
 #[derive(Debug)]
 pub struct BadCredentialsError {
