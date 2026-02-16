@@ -29,10 +29,7 @@ pub async fn create_test_user(
 }
 
 pub async fn cleanup_test_user(db: &DatabaseConnection, user_id: Uuid) {
-    users::Entity::delete_by_id(user_id)
-        .exec(db)
-        .await
-        .ok();
+    users::Entity::delete_by_id(user_id).exec(db).await.ok();
 }
 
 pub fn create_test_token(user: &users::Model) -> crate::authentication::token::Token {
@@ -45,9 +42,7 @@ pub fn create_expired_token(user: &users::Model) -> crate::authentication::token
     use chrono::Duration;
     use jsonwebtoken::{encode, EncodingKey, Header};
 
-    let expiration = Utc::now()
-        .checked_sub_signed(Duration::hours(1))
-        .unwrap();
+    let expiration = Utc::now().checked_sub_signed(Duration::hours(1)).unwrap();
     let secret = std::env::var("TOKEN_SECRET").unwrap_or_else(|_| "secret".to_string());
 
     let claims = Claims {
@@ -58,8 +53,12 @@ pub fn create_expired_token(user: &users::Model) -> crate::authentication::token
         jti: Uuid::new_v4().to_string(),
     };
 
-    let token_string =
-        encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_ref())).unwrap();
+    let token_string = encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_ref()),
+    )
+    .unwrap();
 
     crate::authentication::token::Token::new(token_string)
 }
@@ -73,9 +72,7 @@ pub fn create_invalid_signature_token(user: &users::Model) -> crate::authenticat
     use chrono::Duration;
     use jsonwebtoken::{encode, EncodingKey, Header};
 
-    let expiration = Utc::now()
-        .checked_add_signed(Duration::hours(1))
-        .unwrap();
+    let expiration = Utc::now().checked_add_signed(Duration::hours(1)).unwrap();
 
     let claims = Claims {
         iss: "localhost".to_string(),
@@ -100,9 +97,7 @@ pub fn create_token_for_nonexistent_user() -> crate::authentication::token::Toke
     use chrono::Duration;
     use jsonwebtoken::{encode, EncodingKey, Header};
 
-    let expiration = Utc::now()
-        .checked_add_signed(Duration::hours(1))
-        .unwrap();
+    let expiration = Utc::now().checked_add_signed(Duration::hours(1)).unwrap();
     let secret = std::env::var("TOKEN_SECRET").unwrap_or_else(|_| "secret".to_string());
 
     let claims = Claims {
@@ -113,8 +108,12 @@ pub fn create_token_for_nonexistent_user() -> crate::authentication::token::Toke
         jti: Uuid::new_v4().to_string(),
     };
 
-    let token_string =
-        encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_ref())).unwrap();
+    let token_string = encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_ref()),
+    )
+    .unwrap();
 
     crate::authentication::token::Token::new(token_string)
 }

@@ -1,6 +1,6 @@
 use async_graphql::SimpleObject;
-use std::fmt;
 use services::AuthenticationError;
+use std::fmt;
 
 #[derive(SimpleObject, Debug)]
 pub struct DbError {
@@ -9,7 +9,9 @@ pub struct DbError {
 
 impl From<sea_orm::error::DbErr> for DbError {
     fn from(e: sea_orm::error::DbErr) -> Self {
-        DbError { message: e.to_string() }
+        DbError {
+            message: e.to_string(),
+        }
     }
 }
 
@@ -26,19 +28,25 @@ pub struct AuthError {
 
 impl From<AuthenticationError> for AuthError {
     fn from(e: AuthenticationError) -> Self {
-        AuthError { message: e.to_string() }
+        AuthError {
+            message: e.to_string(),
+        }
     }
 }
 
 impl From<crate::utilities::requires_auth::AuthenticationError> for AuthError {
     fn from(e: crate::utilities::requires_auth::AuthenticationError) -> Self {
-        AuthError { message: e.to_string() }
+        AuthError {
+            message: e.to_string(),
+        }
     }
 }
 
 impl From<sea_orm::error::DbErr> for AuthError {
     fn from(e: sea_orm::error::DbErr) -> Self {
-        AuthError { message: e.to_string() }
+        AuthError {
+            message: e.to_string(),
+        }
     }
 }
 

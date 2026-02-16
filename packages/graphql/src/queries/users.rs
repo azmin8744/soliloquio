@@ -1,7 +1,7 @@
-use async_graphql::{Context, Object, Result};
+use crate::errors::AuthError;
 use crate::types::user::User as UserType;
 use crate::utilities::requires_auth::RequiresAuth;
-use crate::errors::AuthError;
+use async_graphql::{Context, Object, Result};
 
 #[derive(Default)]
 pub struct UserQueries;
@@ -83,9 +83,7 @@ mod tests {
 
         // Should have error because password field doesn't exist
         assert!(!res.errors.is_empty());
-        assert!(res.errors[0]
-            .message
-            .contains("Unknown field \"password\""));
+        assert!(res.errors[0].message.contains("Unknown field \"password\""));
 
         cleanup_test_user_by_email(&db, &email).await;
     }

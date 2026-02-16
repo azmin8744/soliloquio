@@ -21,7 +21,10 @@ impl ValidationError {
     /// Combine multiple validation errors into one
     pub fn combine(mut self, other: ValidationError) -> Self {
         for (field, messages) in other.errors {
-            self.errors.entry(field).or_insert_with(Vec::new).extend(messages);
+            self.errors
+                .entry(field)
+                .or_insert_with(Vec::new)
+                .extend(messages);
         }
         self
     }
@@ -47,7 +50,7 @@ impl fmt::Display for ValidationError {
 pub trait ActiveModelValidator {
     /// Validate the active model and return any validation errors
     fn validate(&self) -> Result<(), ValidationError>;
-    
+
     /// Check if the model is valid
     fn is_valid(&self) -> bool {
         self.validate().is_ok()

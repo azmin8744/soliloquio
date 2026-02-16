@@ -1,6 +1,8 @@
 use async_graphql::InputObject;
-use services::validation::input_validator::{InputValidator, ValidationErrors, ValidationErrorsExt};
 use services::validation::field_validators::FieldValidator;
+use services::validation::input_validator::{
+    InputValidator, ValidationErrors, ValidationErrorsExt,
+};
 
 #[derive(InputObject)]
 pub struct SignUpInput {
@@ -11,10 +13,10 @@ pub struct SignUpInput {
 impl InputValidator for SignUpInput {
     fn validate(&self) -> Result<(), ValidationErrors> {
         let mut errors = ValidationErrors::new();
-        
+
         FieldValidator::validate_email(&self.email, &mut errors);
         FieldValidator::validate_password_field(&self.password, "password", &mut errors);
-        
+
         if errors.is_empty() {
             Ok(())
         } else {
@@ -32,10 +34,10 @@ pub struct SignInInput {
 impl InputValidator for SignInInput {
     fn validate(&self) -> Result<(), ValidationErrors> {
         let mut errors = ValidationErrors::new();
-        
+
         FieldValidator::validate_required_string(&self.email, "email", &mut errors);
         FieldValidator::validate_required_string(&self.password, "password", &mut errors);
-        
+
         if errors.is_empty() {
             Ok(())
         } else {
@@ -53,11 +55,19 @@ pub struct ChangePasswordInput {
 impl InputValidator for ChangePasswordInput {
     fn validate(&self) -> Result<(), ValidationErrors> {
         let mut errors = ValidationErrors::new();
-        
-        FieldValidator::validate_required_string(&self.current_password, "current_password", &mut errors);
+
+        FieldValidator::validate_required_string(
+            &self.current_password,
+            "current_password",
+            &mut errors,
+        );
         FieldValidator::validate_password_field(&self.new_password, "new_password", &mut errors);
-        FieldValidator::validate_passwords_different(&self.current_password, &self.new_password, &mut errors);
-        
+        FieldValidator::validate_passwords_different(
+            &self.current_password,
+            &self.new_password,
+            &mut errors,
+        );
+
         if errors.is_empty() {
             Ok(())
         } else {

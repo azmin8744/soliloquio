@@ -3,7 +3,4 @@ mod posts;
 mod users;
 
 #[derive(MergedObject, Default)]
-pub struct Queries(
-    users::UserQueries,
-    posts::PostQueries,
-);
+pub struct Queries(users::UserQueries, posts::PostQueries);

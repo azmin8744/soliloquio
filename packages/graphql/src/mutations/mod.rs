@@ -1,11 +1,7 @@
 use async_graphql::MergedObject;
+mod input_validators;
 mod posts;
 mod users;
-mod input_validators;
 
 #[derive(MergedObject, Default)]
-pub struct Mutations(
-    posts::PostMutation,
-    users::UserMutation,
-);
-
+pub struct Mutations(posts::PostMutation, users::UserMutation);

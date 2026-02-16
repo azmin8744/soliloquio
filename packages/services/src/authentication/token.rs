@@ -1,11 +1,13 @@
 use crate::claims::Claims;
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation, errors::Error};
-use chrono::{Duration, Utc, DateTime, NaiveDateTime};
-use uuid::Uuid;
-use std::{env, fmt};
-use models::users::Model as User;
-use sha2::{Sha256, Digest};
 use base64::{engine::general_purpose, Engine};
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use jsonwebtoken::{
+    decode, encode, errors::Error, DecodingKey, EncodingKey, Header, TokenData, Validation,
+};
+use models::users::Model as User;
+use sha2::{Digest, Sha256};
+use std::{env, fmt};
+use uuid::Uuid;
 
 pub struct Token(pub String);
 
@@ -16,7 +18,9 @@ pub struct AuthError {
 
 impl From<jsonwebtoken::errors::Error> for AuthError {
     fn from(e: jsonwebtoken::errors::Error) -> Self {
-        AuthError { message: e.to_string() }
+        AuthError {
+            message: e.to_string(),
+        }
     }
 }
 
@@ -28,7 +32,11 @@ impl fmt::Display for AuthError {
 
 trait TokenTrait {
     fn verify(&self, token: String) -> Result<TokenData<Claims>, Error> {
-        decode::<Claims>(&token, &DecodingKey::from_secret(secret().as_ref()), &Validation::default())
+        decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(secret().as_ref()),
+            &Validation::default(),
+        )
     }
 }
 impl TokenTrait for Token {}
@@ -56,8 +64,9 @@ impl Token {
     /// Get user ID from token
     pub fn get_user_id(&self) -> Result<Uuid, AuthError> {
         let claims = self.get_claims()?;
-        let user_id = claims.sub.parse::<Uuid>()
-            .map_err(|_| AuthError { message: "Invalid user ID in token".to_string() })?;
+        let user_id = claims.sub.parse::<Uuid>().map_err(|_| AuthError {
+            message: "Invalid user ID in token".to_string(),
+        })?;
         Ok(user_id)
     }
 
@@ -65,7 +74,9 @@ impl Token {
     pub fn get_expiration(&self) -> Result<NaiveDateTime, AuthError> {
         let claims = self.get_claims()?;
         let expiration = DateTime::from_timestamp(claims.exp, 0)
-            .ok_or(AuthError { message: "Invalid expiration timestamp".to_string() })?
+            .ok_or(AuthError {
+                message: "Invalid expiration timestamp".to_string(),
+            })?
             .naive_utc();
         Ok(expiration)
     }
@@ -74,7 +85,9 @@ impl Token {
     pub fn get_issued_at(&self) -> Result<NaiveDateTime, AuthError> {
         let claims = self.get_claims()?;
         let issued_at = DateTime::from_timestamp(claims.iat, 0)
-            .ok_or(AuthError { message: "Invalid issued-at timestamp".to_string() })?
+            .ok_or(AuthError {
+                message: "Invalid issued-at timestamp".to_string(),
+            })?
             .naive_utc();
         Ok(issued_at)
     }
@@ -101,7 +114,9 @@ impl Token {
 }
 
 pub fn generate_token(user: &User) -> String {
-    let expiration = Utc::now().checked_add_signed(Duration::seconds(expiration())).unwrap();
+    let expiration = Utc::now()
+        .checked_add_signed(Duration::seconds(expiration()))
+        .unwrap();
     let host_name = env::var("HOST_NAME").unwrap();
     let claims = Claims {
         iss: host_name,
@@ -111,11 +126,18 @@ pub fn generate_token(user: &User) -> String {
         jti: Uuid::new_v4().to_string(),
     };
 
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret().as_ref())).unwrap()
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret().as_ref()),
+    )
+    .unwrap()
 }
 
 pub fn generate_refresh_token(user_id: String) -> String {
-    let expiration = Utc::now().checked_add_signed(Duration::days(refresh_token_expiration())).unwrap();
+    let expiration = Utc::now()
+        .checked_add_signed(Duration::days(refresh_token_expiration()))
+        .unwrap();
     let host_name = env::var("HOST_NAME").unwrap();
     let claims = Claims {
         iss: host_name,
@@ -125,7 +147,12 @@ pub fn generate_refresh_token(user_id: String) -> String {
         jti: Uuid::new_v4().to_string(),
     };
 
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret().as_ref())).unwrap()
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret().as_ref()),
+    )
+    .unwrap()
 }
 
 /// Hash a token string using SHA256 for secure storage
@@ -141,11 +168,17 @@ fn secret() -> String {
 }
 
 fn expiration() -> i64 {
-    env::var("TOKEN_EXPIRATION_SECONDS").unwrap().parse::<i64>().unwrap()
+    env::var("TOKEN_EXPIRATION_SECONDS")
+        .unwrap()
+        .parse::<i64>()
+        .unwrap()
 }
 
 fn refresh_token_expiration() -> i64 {
-    env::var("REFRESH_TOKEN_EXPIRATION_DAYS").unwrap().parse::<i64>().unwrap()
+    env::var("REFRESH_TOKEN_EXPIRATION_DAYS")
+        .unwrap()
+        .parse::<i64>()
+        .unwrap()
 }
 
 #[cfg(test)]
@@ -159,35 +192,35 @@ mod tests {
         let token = Token::new(bearer_token.to_string());
         let parsed = token.get_token_string();
         assert_eq!(parsed, "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.test");
-        
+
         // Test direct token parsing
         let direct_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.test";
         let token2 = Token::new(direct_token.to_string());
         let parsed2 = token2.get_token_string();
         assert_eq!(parsed2, direct_token);
-        
+
         println!("✅ Token parsing works correctly");
     }
 
     #[test]
     fn test_token_hashing() {
-        // Test token hashing functionality  
+        // Test token hashing functionality
         let original_token = "test_token_123";
         let hash1 = hash_token(original_token);
         let hash2 = hash_token(original_token);
-        
+
         // Hashes should be identical for the same input
         assert_eq!(hash1, hash2);
-        
+
         // Different tokens should produce different hashes
         let different_token = "different_token_456";
         let hash3 = hash_token(different_token);
         assert_ne!(hash1, hash3);
-        
+
         // Hash should not be empty and should be base64 encoded
         assert!(!hash1.is_empty());
         assert!(hash1.len() > 40); // SHA256 hash should be 43 chars when base64 encoded
-        
+
         println!("✅ Token hashing works correctly");
     }
 }
