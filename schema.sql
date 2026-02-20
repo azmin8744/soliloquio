@@ -35,3 +35,5 @@ create index idx_refresh_tokens_expires_at on refresh_tokens(expires_at);
 alter table posts add constraint fk_user_id foreign key (user_id) references users (id);
 
 create index idx_posts_user_pagination on posts (user_id, created_at desc, id desc);
+create index idx_posts_user_updated_at on posts (user_id, updated_at desc, id desc);
+create index idx_posts_user_title on posts (user_id, title asc, id asc);

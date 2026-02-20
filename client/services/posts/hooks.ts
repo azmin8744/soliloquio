@@ -9,16 +9,20 @@ import {
   AddPostInput,
   DeletePostInput,
   PostConnection,
+  PostSortParams,
   UpdatePostInput,
 } from "./types.ts";
 import { postKeys } from "./keys.ts";
 import { UUID } from "../../domains/common.ts";
 
-export function usePosts() {
+export function usePosts(sort?: PostSortParams) {
   return useInfiniteQuery<PostConnection>({
-    queryKey: postKeys.lists(),
+    queryKey: postKeys.lists(sort),
     queryFn: async ({ pageParam }) => {
-      return await getPosts({ after: pageParam as string | undefined });
+      return await getPosts({
+        after: pageParam as string | undefined,
+        sort,
+      });
     },
     initialPageParam: undefined,
     getNextPageParam: (lastPage) =>

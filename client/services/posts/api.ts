@@ -5,6 +5,7 @@ import {
   DeletePostInput,
   PostConnection,
   PostMutationResult,
+  PostSortParams,
   UpdatePostInput,
 } from "./types.ts";
 import { Post } from "../../domains/posts.ts";
@@ -71,8 +72,8 @@ const DELETE_POST_MUTATION = `
 `;
 
 const GET_POSTS_QUERY = `
-  query GetPosts($after: String, $first: Int) {
-    posts(after: $after, first: $first) {
+  query GetPosts($after: String, $first: Int, $sortBy: PostSortBy, $sortDirection: SortDirection) {
+    posts(after: $after, first: $first, sortBy: $sortBy, sortDirection: $sortDirection) {
       pageInfo {
         hasNextPage
         endCursor
@@ -138,12 +139,16 @@ export async function deletePost(
 }
 
 export async function getPosts(
-  { after, first }: { after?: string; first?: number } = {},
+  { after, first, sort }: {
+    after?: string;
+    first?: number;
+    sort?: PostSortParams;
+  } = {},
 ): Promise<PostConnection> {
   const client = getGraphQLClient();
   const data = await client.request<{ posts: PostConnection }>(
     GET_POSTS_QUERY,
-    { after, first },
+    { after, first, sortBy: sort?.sortBy, sortDirection: sort?.sortDirection },
   );
   return data.posts;
 }

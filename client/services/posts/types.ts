@@ -30,3 +30,10 @@ export interface DeletePostInput {
 }
 
 export type PostMutationResult = Post | DeletedPost | DbError | AuthError;
+
+export type PostSortBy = "CREATED_AT" | "UPDATED_AT" | "TITLE";
+export type SortDirection = "ASC" | "DESC";
+export interface PostSortParams {
+  sortBy: PostSortBy;
+  sortDirection: SortDirection;
+}

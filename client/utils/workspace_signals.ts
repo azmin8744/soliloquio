@@ -1,10 +1,36 @@
 import { computed, signal } from "@preact/signals";
 import type { Post } from "../domains/posts.ts";
+import type { PostSortParams } from "../services/posts/types.ts";
 
 export interface EditorBuffer {
   title: string;
   markdownContent: string;
   isPublished: boolean;
+}
+
+const SORT_STORAGE_KEY = "soliloquio_sort";
+const DEFAULT_SORT: PostSortParams = {
+  sortBy: "CREATED_AT",
+  sortDirection: "DESC",
+};
+
+function loadSort(): PostSortParams {
+  try {
+    const raw = localStorage.getItem(SORT_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* noop */ }
+  return DEFAULT_SORT;
+}
+
+export const sortSignal = signal<PostSortParams>(
+  typeof localStorage !== "undefined" ? loadSort() : DEFAULT_SORT,
+);
+
+export function setSort(sort: PostSortParams) {
+  sortSignal.value = sort;
+  try {
+    localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(sort));
+  } catch { /* noop */ }
 }
 
 export const postsSignal = signal<Post[]>([]);

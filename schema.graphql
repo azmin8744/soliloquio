@@ -129,6 +129,12 @@ type PostEdge {
 
 union PostMutationResult = Post | DeletedPost | DbError | AuthError
 
+enum PostSortBy {
+	CREATED_AT
+	UPDATED_AT
+	TITLE
+}
+
 type Queries {
 	"""
 	Get the currently authenticated user's profile
@@ -137,7 +143,7 @@ type Queries {
 	"""
 	Get paginated posts for the authenticated user
 	"""
-	posts(after: String, first: Int): PostConnection!
+	posts(after: String, first: Int, sortBy: PostSortBy, sortDirection: SortDirection): PostConnection!
 	"""
 	Get a specific post by ID for the authenticated user
 	"""
@@ -152,6 +158,11 @@ input SignInInput {
 input SignUpInput {
 	email: String!
 	password: String!
+}
+
+enum SortDirection {
+	ASC
+	DESC
 }
 
 

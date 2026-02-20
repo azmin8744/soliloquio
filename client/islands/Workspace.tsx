@@ -18,6 +18,8 @@ import {
   loadPostIntoBuffer,
   markBufferClean,
   postsSignal,
+  setSort,
+  sortSignal,
 } from "../utils/workspace_signals.ts";
 import type { EditorBuffer } from "../utils/workspace_signals.ts";
 import { useAutoSave } from "../utils/use_auto_save.ts";
@@ -30,13 +32,14 @@ const RECOVERY_KEY = "soliloquio_editor_recovery";
 function WorkspaceInner() {
   const { data: user, isLoading: authLoading } = useMe();
   const logout = useLogout();
+  const currentSort = sortSignal.value;
   const {
     data: postsData,
     isLoading: _postsLoading,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = usePosts();
+  } = usePosts(currentSort);
   const createPost = useCreatePost();
   const updatePost = useUpdatePost();
   const deletePost = useDeletePost();
@@ -210,6 +213,8 @@ function WorkspaceInner() {
         onLoadMore={() => fetchNextPage()}
         hasNextPage={!!hasNextPage}
         isFetchingNextPage={isFetchingNextPage}
+        sort={currentSort}
+        onSortChange={setSort}
       />
       <EditorPane
         editorBuffer={editorBuffer.value}

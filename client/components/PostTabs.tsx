@@ -1,5 +1,29 @@
 import { useEffect, useRef } from "preact/hooks";
 import type { Post } from "../domains/posts.ts";
+import type { PostSortParams } from "../services/posts/types.ts";
+
+const SORT_OPTIONS: { label: string; value: PostSortParams }[] = [
+  { label: "Newest", value: { sortBy: "CREATED_AT", sortDirection: "DESC" } },
+  { label: "Oldest", value: { sortBy: "CREATED_AT", sortDirection: "ASC" } },
+  {
+    label: "Last updated",
+    value: { sortBy: "UPDATED_AT", sortDirection: "DESC" },
+  },
+  { label: "Title A\u2013Z", value: { sortBy: "TITLE", sortDirection: "ASC" } },
+  {
+    label: "Title Z\u2013A",
+    value: { sortBy: "TITLE", sortDirection: "DESC" },
+  },
+];
+
+function sortIndex(sort: PostSortParams): number {
+  const idx = SORT_OPTIONS.findIndex(
+    (o) =>
+      o.value.sortBy === sort.sortBy &&
+      o.value.sortDirection === sort.sortDirection,
+  );
+  return idx >= 0 ? idx : 0;
+}
 
 interface PostTabsProps {
   posts: Post[];
@@ -10,6 +34,8 @@ interface PostTabsProps {
   onLoadMore: () => void;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
+  sort: PostSortParams;
+  onSortChange: (sort: PostSortParams) => void;
 }
 
 export function PostTabs(
@@ -22,6 +48,8 @@ export function PostTabs(
     onLoadMore,
     hasNextPage,
     isFetchingNextPage,
+    sort,
+    onSortChange,
   }: PostTabsProps,
 ) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -48,7 +76,7 @@ export function PostTabs(
   return (
     <div class="w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
       {/* Header */}
-      <div class="p-3 border-b border-gray-200">
+      <div class="p-3 border-b border-gray-200 space-y-2">
         <button
           onClick={onNewPost}
           disabled={isCreating}
@@ -56,6 +84,18 @@ export function PostTabs(
         >
           {isCreating ? "Creating..." : "+ New Post"}
         </button>
+        <select
+          value={sortIndex(sort)}
+          onChange={(e) => {
+            const idx = Number((e.target as HTMLSelectElement).value);
+            onSortChange(SORT_OPTIONS[idx].value);
+          }}
+          class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+        >
+          {SORT_OPTIONS.map((opt, i) => (
+            <option key={i} value={i}>{opt.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Post list */}
