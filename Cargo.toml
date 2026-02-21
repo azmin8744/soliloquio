@@ -1,4 +1,4 @@
-workspace = { members = ["packages/graphql", "tools/schema"] }
+workspace = { members = ["packages/graphql", "packages/data-access-objects", "packages/repositories", "tools/schema"] }
 [package]
 name = "soliloquio"
 version = "0.1.0"

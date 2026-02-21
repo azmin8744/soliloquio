@@ -1086,6 +1086,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "data-access-objects"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "models",
+ "sea-orm",
+ "uuid",
+]
+
+[[package]]
 name = "der"
 version = "0.7.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1565,6 +1575,7 @@ dependencies = [
  "models",
  "password-hash",
  "pulldown-cmark",
+ "repositories",
  "sea-orm",
  "serde",
  "serde_json",
@@ -2966,6 +2977,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71fe3824f5629716b1589be05dacd749f6aa084c87e00e016714a8cdfccc997c"
 dependencies = [
  "bytecheck",
+]
+
+[[package]]
+name = "repositories"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "data-access-objects",
+ "dotenvy",
+ "models",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

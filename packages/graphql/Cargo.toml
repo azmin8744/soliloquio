@@ -22,6 +22,7 @@ base64 = { version = "^0.22.1" }
 pulldown-cmark = "0.11"
 dashmap = "6.1"
 tracing = "0.1"
+repositories = { path = "../repositories" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
