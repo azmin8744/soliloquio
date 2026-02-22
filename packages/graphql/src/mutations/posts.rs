@@ -18,6 +18,8 @@ struct AddPostInput {
     title: String,
     content: String,
     is_published: Option<bool>,
+    description: Option<String>,
+    slug: Option<String>,
 }
 
 #[derive(InputObject)]
@@ -26,6 +28,8 @@ struct UpdatePostInput {
     title: String,
     content: String,
     is_published: Option<bool>,
+    description: Option<String>,
+    slug: Option<String>,
 }
 
 #[derive(InputObject)]
@@ -38,6 +42,8 @@ fn model_to_post_type(p: &models::posts::Model) -> PostType {
         id: p.id,
         title: p.title.clone(),
         markdown_content: p.markdown_content.clone().unwrap_or_default(),
+        description: p.description.clone(),
+        slug: p.slug.clone(),
         is_published: p.is_published,
         first_published_at: p.first_published_at,
         created_at: p.created_at,
@@ -93,6 +99,8 @@ impl PostMutations for PostMutation {
             new_post.title,
             new_post.content,
             is_published,
+            new_post.description,
+            new_post.slug,
         )
         .await
         {
@@ -132,6 +140,8 @@ impl PostMutations for PostMutation {
             post.title,
             post.content,
             post.is_published,
+            post.description,
+            post.slug,
         )
         .await
         {

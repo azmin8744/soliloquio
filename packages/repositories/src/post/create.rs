@@ -3,7 +3,7 @@ use models::posts;
 use sea_orm::entity::prelude::Uuid;
 use sea_orm::*;
 
-use super::PostRepository;
+use super::{slugify, PostRepository};
 
 impl PostRepository {
     pub async fn create_post(
@@ -12,6 +12,8 @@ impl PostRepository {
         title: String,
         content: String,
         is_published: bool,
+        description: Option<String>,
+        slug: Option<String>,
     ) -> Result<posts::Model, String> {
         let first_published_at = if is_published {
             Some(chrono::Utc::now().naive_utc())
@@ -19,19 +21,43 @@ impl PostRepository {
             None
         };
 
-        let model = posts::ActiveModel {
-            id: ActiveValue::set(Uuid::new_v4()),
-            title: ActiveValue::set(title),
-            markdown_content: ActiveValue::set(Some(content)),
-            user_id: ActiveValue::set(user_id),
-            is_published: ActiveValue::set(is_published),
-            first_published_at: ActiveValue::set(first_published_at),
-            ..Default::default()
-        };
+        let base_slug = slug.unwrap_or_else(|| slugify(&title));
 
-        PostDao::insert(db, model)
-            .await
-            .map_err(|e| format!("Database error: {}", e))
+        for attempt in 0u32..10 {
+            let candidate = if attempt == 0 {
+                base_slug.clone()
+            } else {
+                format!("{}-{}", base_slug, attempt + 1)
+            };
+
+            let model = posts::ActiveModel {
+                id: ActiveValue::set(Uuid::new_v4()),
+                title: ActiveValue::set(title.clone()),
+                markdown_content: ActiveValue::set(Some(content.clone())),
+                user_id: ActiveValue::set(user_id),
+                is_published: ActiveValue::set(is_published),
+                first_published_at: ActiveValue::set(first_published_at),
+                description: ActiveValue::set(description.clone()),
+                slug: ActiveValue::set(Some(candidate)),
+                ..Default::default()
+            };
+
+            match PostDao::insert(db, model).await {
+                Ok(post) => return Ok(post),
+                Err(e) => {
+                    let msg = e.to_string();
+                    if msg.contains("23505")
+                        || msg.contains("duplicate key")
+                        || msg.contains("unique constraint")
+                    {
+                        continue;
+                    }
+                    return Err(format!("Database error: {}", e));
+                }
+            }
+        }
+
+        Err("Could not generate unique slug after 10 attempts".to_string())
     }
 }
 
@@ -46,7 +72,7 @@ mod tests {
         let (user, email) = create_test_user(&db, "repo_create").await;
 
         let post = PostRepository::create_post(
-            &db, user.id, "MD Post".into(), "# Heading".into(), false,
+            &db, user.id, "MD Post".into(), "# Heading".into(), false, None, None,
         ).await.unwrap();
 
         assert_eq!(post.title, "MD Post");
@@ -61,7 +87,7 @@ mod tests {
         let (user, email) = create_test_user(&db, "repo_unpub").await;
 
         let post = PostRepository::create_post(
-            &db, user.id, "Unpub".into(), "c".into(), false,
+            &db, user.id, "Unpub".into(), "c".into(), false, None, None,
         ).await.unwrap();
 
         assert!(!post.is_published);
@@ -76,7 +102,7 @@ mod tests {
         let (user, email) = create_test_user(&db, "repo_pub").await;
 
         let post = PostRepository::create_post(
-            &db, user.id, "Pub".into(), "c".into(), true,
+            &db, user.id, "Pub".into(), "c".into(), true, None, None,
         ).await.unwrap();
 
         assert!(post.is_published);
@@ -91,13 +117,60 @@ mod tests {
         let (user, email) = create_test_user(&db, "repo_fields").await;
 
         let post = PostRepository::create_post(
-            &db, user.id, "Return Test".into(), "body".into(), false,
+            &db, user.id, "Return Test".into(), "body".into(), false, None, None,
         ).await.unwrap();
 
         assert!(!post.id.is_nil());
         assert_eq!(post.title, "Return Test");
         assert_eq!(post.markdown_content.as_deref(), Some("body"));
         assert!(!post.is_published);
+
+        cleanup_user_by_email(&db, &email).await;
+    }
+
+    #[tokio::test]
+    async fn test_create_post_auto_generates_slug_from_title() {
+        let db = setup_test_db().await;
+        let (user, email) = create_test_user(&db, "repo_slug_auto").await;
+
+        let post = PostRepository::create_post(
+            &db, user.id, "Hello World".into(), "".into(), false, None, None,
+        ).await.unwrap();
+
+        assert_eq!(post.slug.as_deref(), Some("hello-world"));
+
+        cleanup_user_by_email(&db, &email).await;
+    }
+
+    #[tokio::test]
+    async fn test_create_post_uses_provided_slug() {
+        let db = setup_test_db().await;
+        let (user, email) = create_test_user(&db, "repo_slug_custom").await;
+
+        let post = PostRepository::create_post(
+            &db, user.id, "Title".into(), "".into(), false, None, Some("my-custom-slug".into()),
+        ).await.unwrap();
+
+        assert_eq!(post.slug.as_deref(), Some("my-custom-slug"));
+
+        cleanup_user_by_email(&db, &email).await;
+    }
+
+    #[tokio::test]
+    async fn test_create_post_deduplicates_slug() {
+        let db = setup_test_db().await;
+        let (user, email) = create_test_user(&db, "repo_slug_dedup").await;
+
+        let p1 = PostRepository::create_post(
+            &db, user.id, "Dup".into(), "".into(), false, None, None,
+        ).await.unwrap();
+        let p2 = PostRepository::create_post(
+            &db, user.id, "Dup".into(), "".into(), false, None, None,
+        ).await.unwrap();
+
+        assert_ne!(p1.slug, p2.slug);
+        assert_eq!(p1.slug.as_deref(), Some("dup"));
+        assert_eq!(p2.slug.as_deref(), Some("dup-2"));
 
         cleanup_user_by_email(&db, &email).await;
     }

@@ -16,6 +16,8 @@ export interface AddPostInput {
   title: string;
   content: string;
   isPublished?: boolean;
+  description?: string;
+  slug?: string;
 }
 
 export interface UpdatePostInput {
@@ -23,6 +25,8 @@ export interface UpdatePostInput {
   title: string;
   content: string;
   isPublished?: boolean;
+  description?: string;
+  slug?: string;
 }
 
 export interface DeletePostInput {

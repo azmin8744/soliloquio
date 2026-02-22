@@ -127,3 +127,67 @@ pub struct PaginatedPosts {
 }
 
 pub struct PostRepository;
+
+#[cfg(test)]
+mod slug_tests {
+    use super::slugify;
+
+    #[test]
+    fn test_slugify_basic() {
+        assert_eq!(slugify("Hello World"), "hello-world");
+    }
+
+    #[test]
+    fn test_slugify_special_chars() {
+        assert_eq!(slugify("Rust & Cargo!"), "rust-cargo");
+    }
+
+    #[test]
+    fn test_slugify_multiple_spaces() {
+        assert_eq!(slugify("a  b   c"), "a-b-c");
+    }
+
+    #[test]
+    fn test_slugify_leading_trailing_special() {
+        assert_eq!(slugify("  hello  "), "hello");
+    }
+
+    #[test]
+    fn test_slugify_empty() {
+        assert_eq!(slugify(""), "post");
+    }
+
+    #[test]
+    fn test_slugify_numbers() {
+        assert_eq!(slugify("Post 42"), "post-42");
+    }
+}
+
+pub(crate) fn slugify(title: &str) -> String {
+    let s: String = title
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    // collapse consecutive hyphens, trim leading/trailing hyphens
+    let mut out = String::new();
+    let mut prev_hyphen = true; // start true to trim leading
+    for c in s.chars() {
+        if c == '-' {
+            if !prev_hyphen {
+                out.push('-');
+                prev_hyphen = true;
+            }
+        } else {
+            out.push(c);
+            prev_hyphen = false;
+        }
+    }
+    if out.ends_with('-') {
+        out.pop();
+    }
+    if out.is_empty() {
+        out.push_str("post");
+    }
+    out
+}

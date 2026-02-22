@@ -2,6 +2,8 @@ create table posts (
     id uuid primary key,
     title text not null,
     markdown_content text,
+    description text,
+    slug text,
     user_id uuid not null,
     is_published boolean default false not null,
     first_published_at timestamp,
@@ -37,3 +39,4 @@ alter table posts add constraint fk_user_id foreign key (user_id) references use
 create index idx_posts_user_pagination on posts (user_id, created_at desc, id desc);
 create index idx_posts_user_updated_at on posts (user_id, updated_at desc, id desc);
 create index idx_posts_user_title on posts (user_id, title asc, id asc);
+create unique index idx_posts_user_slug on posts (user_id, slug);

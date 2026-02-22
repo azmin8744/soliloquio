@@ -6,7 +6,9 @@ use uuid::Uuid;
 pub struct Post {
     pub id: Uuid,
     pub title: String,
-    pub markdown_content: String, // The original markdown
+    pub markdown_content: String,
+    pub description: Option<String>,
+    pub slug: Option<String>,
     pub is_published: bool,
     pub first_published_at: Option<NaiveDateTime>,
     pub created_at: NaiveDateTime,
@@ -37,6 +39,14 @@ impl Post {
 
     async fn updated_at(&self) -> NaiveDateTime {
         self.updated_at
+    }
+
+    async fn description(&self) -> Option<&String> {
+        self.description.as_ref()
+    }
+
+    async fn slug(&self) -> Option<&String> {
+        self.slug.as_ref()
     }
 
     /// Returns the original markdown content for editing

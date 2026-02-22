@@ -6,6 +6,8 @@ export interface EditorBuffer {
   title: string;
   markdownContent: string;
   isPublished: boolean;
+  description: string;
+  slug: string;
 }
 
 const SORT_STORAGE_KEY = "soliloquio_sort";
@@ -40,6 +42,8 @@ export const editorBuffer = signal<EditorBuffer>({
   title: "",
   markdownContent: "",
   isPublished: false,
+  description: "",
+  slug: "",
 });
 
 // Snapshot of buffer at load time, used to detect changes
@@ -47,6 +51,8 @@ export const lastSavedBuffer = signal<EditorBuffer>({
   title: "",
   markdownContent: "",
   isPublished: false,
+  description: "",
+  slug: "",
 });
 
 export const activePost = computed(() => {
@@ -60,7 +66,9 @@ export const isDirty = computed(() => {
   const current = editorBuffer.value;
   return saved.title !== current.title ||
     saved.markdownContent !== current.markdownContent ||
-    saved.isPublished !== current.isPublished;
+    saved.isPublished !== current.isPublished ||
+    saved.description !== current.description ||
+    saved.slug !== current.slug;
 });
 
 /** Load a post into the editor buffer and mark as clean */
@@ -69,6 +77,8 @@ export function loadPostIntoBuffer(post: Post) {
     title: post.title,
     markdownContent: post.markdownContent,
     isPublished: post.isPublished,
+    description: post.description ?? "",
+    slug: post.slug ?? "",
   };
   editorBuffer.value = buf;
   lastSavedBuffer.value = { ...buf };

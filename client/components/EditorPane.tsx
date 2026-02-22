@@ -111,6 +111,26 @@ export function EditorPane({
               placeholder="Post title"
               class="w-full px-3 py-2 text-lg font-semibold border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
             />
+            <input
+              type="text"
+              value={buffer.slug}
+              onInput={(e) =>
+                onBufferChange({
+                  slug: (e.target as HTMLInputElement).value,
+                })}
+              placeholder="slug (auto-generated from title if empty)"
+              class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-gray-600"
+            />
+            <textarea
+              value={buffer.description}
+              onInput={(e) =>
+                onBufferChange({
+                  description: (e.target as HTMLTextAreaElement).value,
+                })}
+              rows={2}
+              placeholder="Short description…"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none text-gray-600"
+            />
             <textarea
               value={buffer.markdownContent}
               onInput={(e) =>

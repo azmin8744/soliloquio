@@ -80,6 +80,8 @@ function WorkspaceInner() {
           title: "",
           markdownContent: "",
           isPublished: false,
+          description: "",
+          slug: "",
         };
       }
       localStorage.removeItem(RECOVERY_KEY);
@@ -105,6 +107,8 @@ function WorkspaceInner() {
         title: buf.title,
         content: buf.markdownContent,
         isPublished: buf.isPublished,
+        description: buf.description || undefined,
+        slug: buf.slug || undefined,
       },
       {
         onSuccess: (data) => {
@@ -162,11 +166,15 @@ function WorkspaceInner() {
           title: "",
           markdownContent: "",
           isPublished: false,
+          description: "",
+          slug: "",
         };
         lastSavedBuffer.value = {
           title: "",
           markdownContent: "",
           isPublished: false,
+          description: "",
+          slug: "",
         };
       },
     });

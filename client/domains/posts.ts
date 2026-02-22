@@ -9,6 +9,8 @@ export interface Post {
   updatedAt?: NaiveDateTime;
   markdownContent: string;
   content: string;
+  description?: string;
+  slug?: string;
 }
 
 export interface DeletedPost {

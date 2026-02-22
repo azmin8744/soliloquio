@@ -20,6 +20,8 @@ const ADD_POST_MUTATION = `
         content
         markdownContent
         isPublished
+        description
+        slug
         createdAt
         updatedAt
       }
@@ -42,6 +44,8 @@ const UPDATE_POST_MUTATION = `
         content
         markdownContent
         isPublished
+        description
+        slug
         createdAt
         updatedAt
       }

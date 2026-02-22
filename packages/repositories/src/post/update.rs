@@ -13,6 +13,8 @@ impl PostRepository {
         title: String,
         content: String,
         is_published: Option<bool>,
+        description: Option<String>,
+        slug: Option<String>,
     ) -> Result<Model, String> {
         let existing = PostDao::find_by_id_for_user(db, id, user_id)
             .await
@@ -23,6 +25,12 @@ impl PostRepository {
         am.title = ActiveValue::set(title);
         am.markdown_content = ActiveValue::set(Some(content));
         am.updated_at = ActiveValue::set(chrono::Utc::now().naive_utc());
+        if let Some(desc) = description {
+            am.description = ActiveValue::set(Some(desc));
+        }
+        if let Some(s) = slug {
+            am.slug = ActiveValue::set(Some(s));
+        }
 
         if let Some(publish) = is_published {
             am.is_published = ActiveValue::set(publish);
@@ -58,7 +66,7 @@ mod tests {
         let post = create_test_post(&db, user.id, "Original", "content", false).await;
 
         let updated = PostRepository::update_post(
-            &db, user.id, post.id, "Updated Title".into(), "new content".into(), None,
+            &db, user.id, post.id, "Updated Title".into(), "new content".into(), None, None, None,
         ).await.unwrap();
 
         assert_eq!(updated.title, "Updated Title");
@@ -77,7 +85,7 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
         let updated = PostRepository::update_post(
-            &db, user.id, post.id, "Updated".into(), "new".into(), None,
+            &db, user.id, post.id, "Updated".into(), "new".into(), None, None, None,
         ).await.unwrap();
 
         assert!(updated.updated_at > original_updated_at);
@@ -92,7 +100,7 @@ mod tests {
         let fake_id = Uuid::new_v4();
 
         let result = PostRepository::update_post(
-            &db, user.id, fake_id, "New".into(), "new".into(), None,
+            &db, user.id, fake_id, "New".into(), "new".into(), None, None, None,
         ).await;
 
         assert!(result.is_err());
@@ -108,18 +116,18 @@ mod tests {
         let post = create_test_post(&db, user.id, "Title", "content", false).await;
 
         let published = PostRepository::update_post(
-            &db, user.id, post.id, "Title".into(), "content".into(), Some(true),
+            &db, user.id, post.id, "Title".into(), "content".into(), Some(true), None, None,
         ).await.unwrap();
 
         let first_pub = published.first_published_at.unwrap();
         assert!(published.is_published);
 
         PostRepository::update_post(
-            &db, user.id, post.id, "Title".into(), "content".into(), Some(false),
+            &db, user.id, post.id, "Title".into(), "content".into(), Some(false), None, None,
         ).await.unwrap();
 
         let republished = PostRepository::update_post(
-            &db, user.id, post.id, "Title".into(), "content".into(), Some(true),
+            &db, user.id, post.id, "Title".into(), "content".into(), Some(true), None, None,
         ).await.unwrap();
 
         assert_eq!(republished.first_published_at.unwrap(), first_pub);
@@ -135,7 +143,7 @@ mod tests {
         let post = create_test_post(&db, user_a.id, "A's Post", "content", false).await;
 
         let result = PostRepository::update_post(
-            &db, user_b.id, post.id, "Hijacked".into(), "evil".into(), None,
+            &db, user_b.id, post.id, "Hijacked".into(), "evil".into(), None, None, None,
         ).await;
 
         assert!(result.is_err());

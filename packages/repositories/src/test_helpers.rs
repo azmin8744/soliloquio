@@ -49,6 +49,7 @@ pub async fn create_test_post(
         first_published_at: ActiveValue::Set(first_published_at),
         created_at: ActiveValue::Set(chrono::Utc::now().naive_utc()),
         updated_at: ActiveValue::Set(chrono::Utc::now().naive_utc()),
+        ..Default::default()
     };
 
     post.insert(db).await.expect("Failed to create test post")

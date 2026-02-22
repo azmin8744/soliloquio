@@ -16,6 +16,10 @@ pub struct Model {
     pub updated_at: DateTime,
     #[sea_orm(column_type = "Text", nullable)]
     pub markdown_content: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub description: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub slug: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
