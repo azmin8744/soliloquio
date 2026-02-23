@@ -58,6 +58,16 @@ impl PostRepository {
             .await
             .map_err(|e| format!("Database error: {}", e))
     }
+
+    pub async fn search_posts(
+        db: &DatabaseConnection,
+        user_id: Uuid,
+        q: &str,
+    ) -> Result<Vec<Model>, String> {
+        PostDao::search_bm25(db, user_id, q)
+            .await
+            .map_err(|e| format!("Database error: {}", e))
+    }
 }
 
 #[cfg(test)]

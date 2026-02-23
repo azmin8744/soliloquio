@@ -55,9 +55,24 @@ impl PostQueries {
         first: Option<i32>,
         sort_by: Option<PostSortBy>,
         sort_direction: Option<SortDirection>,
+        search: Option<String>,
     ) -> Result<Connection<String, PostType, EmptyFields, EmptyFields>> {
         let user = self.require_authenticate_as_user(ctx).await?;
         let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        let search = search.as_deref().map(str::trim).filter(|s| !s.is_empty());
+        if let Some(q) = search {
+            let posts = repositories::PostRepository::search_posts(db, user.id, q)
+                .await
+                .map_err(|e| async_graphql::Error::new(e))?;
+            let mut connection = Connection::new(false, false);
+            for post in &posts {
+                connection
+                    .edges
+                    .push(Edge::new(post.id.to_string(), model_to_post_type(post)));
+            }
+            return Ok(connection);
+        }
 
         let sort_by = sort_by.unwrap_or(PostSortBy::CreatedAt);
         let sort_dir = sort_direction.unwrap_or(SortDirection::Desc);
