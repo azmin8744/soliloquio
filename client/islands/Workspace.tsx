@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { getQueryClient } from "../utils/query_client.ts";
-import { useLogout, useMe } from "../services/auth/hooks.ts";
+import { useMe } from "../services/auth/hooks.ts";
 import {
   useCreatePost,
   useDeletePost,
@@ -25,7 +25,6 @@ import {
 } from "../utils/workspace_signals.ts";
 import type { EditorBuffer } from "../utils/workspace_signals.ts";
 import { useAutoSave } from "../utils/use_auto_save.ts";
-import { NavRail } from "../components/NavRail.tsx";
 import { PostTabs } from "../components/PostTabs.tsx";
 import { EditorPane } from "../components/EditorPane.tsx";
 
@@ -33,7 +32,6 @@ const RECOVERY_KEY = "soliloquio_editor_recovery";
 
 function WorkspaceInner() {
   const { data: user, isLoading: authLoading } = useMe();
-  const logout = useLogout();
   const currentSort = sortSignal.value;
   const currentSearch = searchSignal.value;
   const {
@@ -47,13 +45,6 @@ function WorkspaceInner() {
   const updatePost = useUpdatePost();
   const deletePost = useDeletePost();
   const [recoveryToast, setRecoveryToast] = useState(false);
-
-  // Redirect if unauthenticated
-  useEffect(() => {
-    if (!authLoading && !user) {
-      globalThis.location.href = "/auth/signin";
-    }
-  }, [authLoading, user]);
 
   // Sync posts query → signal
   useEffect(() => {
@@ -188,18 +179,9 @@ function WorkspaceInner() {
     editorBuffer.value = { ...editorBuffer.value, ...partial };
   }, []);
 
-  // Logout
-  const handleLogout = useCallback(() => {
-    logout.mutate(undefined, {
-      onSuccess: () => {
-        globalThis.location.href = "/auth/signin";
-      },
-    });
-  }, []);
-
   if (authLoading) {
     return (
-      <div class="h-screen flex items-center justify-center text-gray-400">
+      <div class="flex-1 flex items-center justify-center text-gray-400">
         Loading...
       </div>
     );
@@ -208,13 +190,7 @@ function WorkspaceInner() {
   if (!user) return null;
 
   return (
-    <div class="h-screen flex bg-gray-50">
-      <NavRail
-        user={user}
-        isLoading={authLoading}
-        onLogout={handleLogout}
-        isLoggingOut={logout.isPending}
-      />
+    <>
       <PostTabs
         posts={postsSignal.value}
         activePostId={activePostId.value}
@@ -253,12 +229,14 @@ function WorkspaceInner() {
             Unsaved work found from previous session.
           </span>
           <button
+            type="button"
             onClick={restoreBuffer}
             class="px-3 py-1 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded"
           >
             Restore
           </button>
           <button
+            type="button"
             onClick={dismissRecovery}
             class="px-3 py-1 text-sm text-gray-500 hover:bg-gray-100 rounded"
           >
@@ -266,7 +244,7 @@ function WorkspaceInner() {
           </button>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

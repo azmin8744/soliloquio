@@ -1,6 +1,9 @@
 import { Head } from "$fresh/runtime.ts";
+import type { RouteConfig } from "$fresh/server.ts";
 import ChangePasswordForm from "../../islands/ChangePasswordForm.tsx";
 import { Card } from "../../components/Card.tsx";
+
+export const config: RouteConfig = { skipInheritedLayouts: true };
 
 export default function ChangePassword() {
   return (

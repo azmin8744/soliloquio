@@ -1,6 +1,9 @@
 import { Head } from "$fresh/runtime.ts";
+import type { RouteConfig } from "$fresh/server.ts";
 import SignInForm from "../../islands/SignInForm.tsx";
 import { Card } from "../../components/Card.tsx";
+
+export const config: RouteConfig = { skipInheritedLayouts: true };
 
 export default function SignIn() {
   return (

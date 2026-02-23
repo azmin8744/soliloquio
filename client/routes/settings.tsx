@@ -8,14 +8,8 @@ export default function Settings() {
       <Head>
         <title>Settings - Soliloquio</title>
       </Head>
-      <div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-        <div class="sm:mx-auto sm:w-full sm:max-w-md">
-          <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Settings
-          </h2>
-        </div>
-
-        <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+      <div class="flex-1 flex items-center justify-center overflow-y-auto">
+        <div class="w-full max-w-md p-8">
           <Card>
             <UserSettingsForm />
           </Card>

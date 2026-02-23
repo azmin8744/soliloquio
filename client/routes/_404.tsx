@@ -1,4 +1,7 @@
 import { Head } from "$fresh/runtime.ts";
+import type { RouteConfig } from "$fresh/server.ts";
+
+export const config: RouteConfig = { skipInheritedLayouts: true };
 
 export default function Error404() {
   return (

@@ -4,6 +4,7 @@
 
 import * as $_404 from "./routes/_404.tsx";
 import * as $_app from "./routes/_app.tsx";
+import * as $_layout from "./routes/_layout.tsx";
 import * as $api_auth_logout from "./routes/api/auth/logout.ts";
 import * as $api_auth_me from "./routes/api/auth/me.ts";
 import * as $api_auth_refresh from "./routes/api/auth/refresh.ts";
@@ -13,8 +14,10 @@ import * as $auth_signin from "./routes/auth/signin.tsx";
 import * as $auth_signup from "./routes/auth/signup.tsx";
 import * as $greet_name_ from "./routes/greet/[name].tsx";
 import * as $index from "./routes/index.tsx";
+import * as $posts from "./routes/posts.tsx";
 import * as $settings from "./routes/settings.tsx";
 import * as $ChangePasswordForm from "./islands/ChangePasswordForm.tsx";
+import * as $NavRailIsland from "./islands/NavRailIsland.tsx";
 import * as $QueryProvider from "./islands/QueryProvider.tsx";
 import * as $SignInForm from "./islands/SignInForm.tsx";
 import * as $SignUpForm from "./islands/SignUpForm.tsx";
@@ -26,6 +29,7 @@ const manifest = {
   routes: {
     "./routes/_404.tsx": $_404,
     "./routes/_app.tsx": $_app,
+    "./routes/_layout.tsx": $_layout,
     "./routes/api/auth/logout.ts": $api_auth_logout,
     "./routes/api/auth/me.ts": $api_auth_me,
     "./routes/api/auth/refresh.ts": $api_auth_refresh,
@@ -35,10 +39,12 @@ const manifest = {
     "./routes/auth/signup.tsx": $auth_signup,
     "./routes/greet/[name].tsx": $greet_name_,
     "./routes/index.tsx": $index,
+    "./routes/posts.tsx": $posts,
     "./routes/settings.tsx": $settings,
   },
   islands: {
     "./islands/ChangePasswordForm.tsx": $ChangePasswordForm,
+    "./islands/NavRailIsland.tsx": $NavRailIsland,
     "./islands/QueryProvider.tsx": $QueryProvider,
     "./islands/SignInForm.tsx": $SignInForm,
     "./islands/SignUpForm.tsx": $SignUpForm,
