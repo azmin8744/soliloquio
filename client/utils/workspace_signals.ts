@@ -35,6 +35,9 @@ export function setSort(sort: PostSortParams) {
   } catch { /* noop */ }
 }
 
+export const searchSignal = signal("");
+export function setSearch(q: string) { searchSignal.value = q; }
+
 export const postsSignal = signal<Post[]>([]);
 export const activePostId = signal<string | null>(null);
 export const isPreviewToggled = signal(false);

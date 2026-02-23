@@ -18,6 +18,8 @@ import {
   loadPostIntoBuffer,
   markBufferClean,
   postsSignal,
+  searchSignal,
+  setSearch,
   setSort,
   sortSignal,
 } from "../utils/workspace_signals.ts";
@@ -33,13 +35,14 @@ function WorkspaceInner() {
   const { data: user, isLoading: authLoading } = useMe();
   const logout = useLogout();
   const currentSort = sortSignal.value;
+  const currentSearch = searchSignal.value;
   const {
     data: postsData,
     isLoading: _postsLoading,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = usePosts(currentSort);
+  } = usePosts(currentSort, currentSearch);
   const createPost = useCreatePost();
   const updatePost = useUpdatePost();
   const deletePost = useDeletePost();
@@ -223,6 +226,8 @@ function WorkspaceInner() {
         isFetchingNextPage={isFetchingNextPage}
         sort={currentSort}
         onSortChange={setSort}
+        search={currentSearch}
+        onSearchChange={setSearch}
       />
       <EditorPane
         editorBuffer={editorBuffer.value}

@@ -76,8 +76,8 @@ const DELETE_POST_MUTATION = `
 `;
 
 const GET_POSTS_QUERY = `
-  query GetPosts($after: String, $first: Int, $sortBy: PostSortBy, $sortDirection: SortDirection) {
-    posts(after: $after, first: $first, sortBy: $sortBy, sortDirection: $sortDirection) {
+  query GetPosts($after: String, $first: Int, $sortBy: PostSortBy, $sortDirection: SortDirection, $search: String) {
+    posts(after: $after, first: $first, sortBy: $sortBy, sortDirection: $sortDirection, search: $search) {
       pageInfo {
         hasNextPage
         endCursor
@@ -143,16 +143,23 @@ export async function deletePost(
 }
 
 export async function getPosts(
-  { after, first, sort }: {
+  { after, first, sort, search }: {
     after?: string;
     first?: number;
     sort?: PostSortParams;
+    search?: string;
   } = {},
 ): Promise<PostConnection> {
   const client = getGraphQLClient();
   const data = await client.request<{ posts: PostConnection }>(
     GET_POSTS_QUERY,
-    { after, first, sortBy: sort?.sortBy, sortDirection: sort?.sortDirection },
+    {
+      after,
+      first,
+      sortBy: sort?.sortBy,
+      sortDirection: sort?.sortDirection,
+      search: search || undefined,
+    },
   );
   return data.posts;
 }

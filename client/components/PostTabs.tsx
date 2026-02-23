@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { Post } from "../domains/posts.ts";
 import type { PostSortParams } from "../services/posts/types.ts";
 
@@ -36,6 +36,8 @@ interface PostTabsProps {
   isFetchingNextPage: boolean;
   sort: PostSortParams;
   onSortChange: (sort: PostSortParams) => void;
+  search: string;
+  onSearchChange: (q: string) => void;
 }
 
 export function PostTabs(
@@ -50,10 +52,31 @@ export function PostTabs(
     isFetchingNextPage,
     sort,
     onSortChange,
+    search,
+    onSearchChange,
   }: PostTabsProps,
 ) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const [inputValue, setInputValue] = useState(search);
+  const debounceRef = useRef<number | null>(null);
+
+  // Sync external search reset (e.g. cleared from outside)
+  useEffect(() => {
+    if (search === "") setInputValue("");
+  }, [search]);
+
+  // Debounce input → onSearchChange
+  useEffect(() => {
+    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onSearchChange(inputValue);
+      debounceRef.current = null;
+    }, 300) as unknown as number;
+    return () => {
+      if (debounceRef.current !== null) clearTimeout(debounceRef.current);
+    };
+  }, [inputValue]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -84,18 +107,40 @@ export function PostTabs(
         >
           {isCreating ? "Creating..." : "+ New Post"}
         </button>
-        <select
-          value={sortIndex(sort)}
-          onChange={(e) => {
-            const idx = Number((e.target as HTMLSelectElement).value);
-            onSortChange(SORT_OPTIONS[idx].value);
-          }}
-          class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-        >
-          {SORT_OPTIONS.map((opt, i) => (
-            <option key={i} value={i}>{opt.label}</option>
-          ))}
-        </select>
+        {/* Search input */}
+        <div class="relative">
+          <input
+            type="text"
+            value={inputValue}
+            onInput={(e) => setInputValue((e.target as HTMLInputElement).value)}
+            placeholder="Search posts..."
+            class="w-full px-2 py-1.5 pr-7 text-xs border border-gray-200 rounded-md bg-white text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+          />
+          {inputValue && (
+            <button
+              onClick={() => { setInputValue(""); onSearchChange(""); }}
+              class="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm leading-none"
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          )}
+        </div>
+        {/* Sort (hidden during search) */}
+        {!search && (
+          <select
+            value={sortIndex(sort)}
+            onChange={(e) => {
+              const idx = Number((e.target as HTMLSelectElement).value);
+              onSortChange(SORT_OPTIONS[idx].value);
+            }}
+            class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+          >
+            {SORT_OPTIONS.map((opt, i) => (
+              <option key={i} value={i}>{opt.label}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Post list */}

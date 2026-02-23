@@ -15,13 +15,14 @@ import {
 import { postKeys } from "./keys.ts";
 import { UUID } from "../../domains/common.ts";
 
-export function usePosts(sort?: PostSortParams) {
+export function usePosts(sort?: PostSortParams, search?: string) {
   return useInfiniteQuery<PostConnection>({
-    queryKey: postKeys.lists(sort),
+    queryKey: postKeys.lists(sort, search),
     queryFn: async ({ pageParam }) => {
       return await getPosts({
         after: pageParam as string | undefined,
         sort,
+        search,
       });
     },
     initialPageParam: undefined,
