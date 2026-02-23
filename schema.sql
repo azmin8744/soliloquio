@@ -40,3 +40,11 @@ create index idx_posts_user_pagination on posts (user_id, created_at desc, id de
 create index idx_posts_user_updated_at on posts (user_id, updated_at desc, id desc);
 create index idx_posts_user_title on posts (user_id, title asc, id asc);
 create unique index idx_posts_user_slug on posts (user_id, slug);
+
+-- BM25 full-text search index (ParadeDB)
+CREATE INDEX posts_search_idx ON posts
+USING bm25(id, title, markdown_content, description)
+WITH (
+    key_field = 'id',
+    text_fields = '{"title": {"tokenizer": {"type": "icu"}}, "markdown_content": {"tokenizer": {"type": "icu"}}, "description": {"tokenizer": {"type": "icu"}}}'
+);
