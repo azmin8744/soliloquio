@@ -4,6 +4,7 @@ import {
   ChangePasswordInput,
   SignInInput,
   SignUpInput,
+  UpdateUserInput,
   UserMutationResult,
 } from "./types.ts";
 import { User } from "../../domains/users.ts";
@@ -67,6 +68,17 @@ const CHANGE_PASSWORD_MUTATION = `
   }
 `;
 
+const UPDATE_USER_MUTATION = `
+  mutation UpdateUser($input: UpdateUserInput!) {
+    updateUser(input: $input) {
+      ... on User { id email }
+      ... on ValidationErrorType { message }
+      ... on AuthError { message }
+      ... on DbError { message }
+    }
+  }
+`;
+
 const ME_QUERY = `
   query Me {
     me {
@@ -105,6 +117,15 @@ export async function changePassword(
     { input },
   );
   return data.changePassword;
+}
+
+export async function updateUser(input: UpdateUserInput): Promise<UserMutationResult> {
+  const client = getGraphQLClient();
+  const data = await client.request<{ updateUser: UserMutationResult }>(
+    UPDATE_USER_MUTATION,
+    { input },
+  );
+  return data.updateUser;
 }
 
 export async function getMe(): Promise<User | null> {

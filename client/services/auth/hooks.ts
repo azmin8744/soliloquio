@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { changePassword, getMe, signIn, signUp } from "./api.ts";
-import { ChangePasswordInput, SignInInput, SignUpInput } from "./types.ts";
+import { changePassword, getMe, signIn, signUp, updateUser } from "./api.ts";
+import { ChangePasswordInput, SignInInput, SignUpInput, UpdateUserInput } from "./types.ts";
 import { authKeys } from "./keys.ts";
 
 export function useSignUp() {
@@ -38,6 +38,18 @@ export function useSignIn() {
 export function useChangePassword() {
   return useMutation({
     mutationFn: (input: ChangePasswordInput) => changePassword(input),
+  });
+}
+
+export function useUpdateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateUserInput) => updateUser(input),
+    onSuccess: (data) => {
+      if ("email" in data) {
+        queryClient.invalidateQueries({ queryKey: authKeys.user() });
+      }
+    },
   });
 }
 
