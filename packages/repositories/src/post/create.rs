@@ -3,7 +3,7 @@ use models::posts;
 use sea_orm::entity::prelude::Uuid;
 use sea_orm::*;
 
-use super::{slugify, PostRepository};
+use super::PostRepository;
 
 impl PostRepository {
     pub async fn create_post(
@@ -21,43 +21,60 @@ impl PostRepository {
             None
         };
 
-        let base_slug = slug.unwrap_or_else(|| slugify(&title));
+        match slug.filter(|s| !s.is_empty()) {
+            None => {
+                let model = posts::ActiveModel {
+                    id: ActiveValue::set(Uuid::new_v4()),
+                    title: ActiveValue::set(title),
+                    markdown_content: ActiveValue::set(Some(content)),
+                    user_id: ActiveValue::set(user_id),
+                    is_published: ActiveValue::set(is_published),
+                    first_published_at: ActiveValue::set(first_published_at),
+                    description: ActiveValue::set(description),
+                    slug: ActiveValue::set(None),
+                    ..Default::default()
+                };
+                PostDao::insert(db, model)
+                    .await
+                    .map_err(|e| format!("Database error: {}", e))
+            }
+            Some(base_slug) => {
+                for attempt in 0u32..10 {
+                    let candidate = if attempt == 0 {
+                        base_slug.clone()
+                    } else {
+                        format!("{}-{}", base_slug, attempt + 1)
+                    };
 
-        for attempt in 0u32..10 {
-            let candidate = if attempt == 0 {
-                base_slug.clone()
-            } else {
-                format!("{}-{}", base_slug, attempt + 1)
-            };
+                    let model = posts::ActiveModel {
+                        id: ActiveValue::set(Uuid::new_v4()),
+                        title: ActiveValue::set(title.clone()),
+                        markdown_content: ActiveValue::set(Some(content.clone())),
+                        user_id: ActiveValue::set(user_id),
+                        is_published: ActiveValue::set(is_published),
+                        first_published_at: ActiveValue::set(first_published_at),
+                        description: ActiveValue::set(description.clone()),
+                        slug: ActiveValue::set(Some(candidate)),
+                        ..Default::default()
+                    };
 
-            let model = posts::ActiveModel {
-                id: ActiveValue::set(Uuid::new_v4()),
-                title: ActiveValue::set(title.clone()),
-                markdown_content: ActiveValue::set(Some(content.clone())),
-                user_id: ActiveValue::set(user_id),
-                is_published: ActiveValue::set(is_published),
-                first_published_at: ActiveValue::set(first_published_at),
-                description: ActiveValue::set(description.clone()),
-                slug: ActiveValue::set(Some(candidate)),
-                ..Default::default()
-            };
-
-            match PostDao::insert(db, model).await {
-                Ok(post) => return Ok(post),
-                Err(e) => {
-                    let msg = e.to_string();
-                    if msg.contains("23505")
-                        || msg.contains("duplicate key")
-                        || msg.contains("unique constraint")
-                    {
-                        continue;
+                    match PostDao::insert(db, model).await {
+                        Ok(post) => return Ok(post),
+                        Err(e) => {
+                            let msg = e.to_string();
+                            if msg.contains("23505")
+                                || msg.contains("duplicate key")
+                                || msg.contains("unique constraint")
+                            {
+                                continue;
+                            }
+                            return Err(format!("Database error: {}", e));
+                        }
                     }
-                    return Err(format!("Database error: {}", e));
                 }
+                Err("Could not generate unique slug after 10 attempts".to_string())
             }
         }
-
-        Err("Could not generate unique slug after 10 attempts".to_string())
     }
 }
 
@@ -129,15 +146,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_create_post_auto_generates_slug_from_title() {
+    async fn test_create_post_null_slug_when_not_provided() {
         let db = setup_test_db().await;
-        let (user, email) = create_test_user(&db, "repo_slug_auto").await;
+        let (user, email) = create_test_user(&db, "repo_slug_null").await;
 
         let post = PostRepository::create_post(
             &db, user.id, "Hello World".into(), "".into(), false, None, None,
         ).await.unwrap();
 
-        assert_eq!(post.slug.as_deref(), Some("hello-world"));
+        assert!(post.slug.is_none());
 
         cleanup_user_by_email(&db, &email).await;
     }
@@ -162,15 +179,15 @@ mod tests {
         let (user, email) = create_test_user(&db, "repo_slug_dedup").await;
 
         let p1 = PostRepository::create_post(
-            &db, user.id, "Dup".into(), "".into(), false, None, None,
+            &db, user.id, "P1".into(), "".into(), false, None, Some("my-slug".into()),
         ).await.unwrap();
         let p2 = PostRepository::create_post(
-            &db, user.id, "Dup".into(), "".into(), false, None, None,
+            &db, user.id, "P2".into(), "".into(), false, None, Some("my-slug".into()),
         ).await.unwrap();
 
         assert_ne!(p1.slug, p2.slug);
-        assert_eq!(p1.slug.as_deref(), Some("dup"));
-        assert_eq!(p2.slug.as_deref(), Some("dup-2"));
+        assert_eq!(p1.slug.as_deref(), Some("my-slug"));
+        assert_eq!(p2.slug.as_deref(), Some("my-slug-2"));
 
         cleanup_user_by_email(&db, &email).await;
     }
