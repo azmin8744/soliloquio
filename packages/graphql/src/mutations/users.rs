@@ -82,6 +82,19 @@ impl UserMutations for UserMutation {
             }));
         }
 
+        // Single user mode: reject if a user already exists
+        if std::env::var("SINGLE_USER_MODE")
+            .unwrap_or_default()
+            .eq_ignore_ascii_case("true")
+        {
+            let count = Users::find().count(db).await.unwrap_or(0);
+            if count >= 1 {
+                return Ok(UserMutationResult::AuthError(AuthError {
+                    message: "Registration is disabled".to_string(),
+                }));
+            }
+        }
+
         // Hash password
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
@@ -673,6 +686,63 @@ mod tests {
 
         assert!(token_count >= 1);
 
+        cleanup_test_user_by_email(&db, &email).await;
+    }
+
+    // ============= single user mode tests =============
+
+    #[tokio::test]
+    async fn test_signup_single_user_mode_rejects_when_user_exists() {
+        let db = setup_test_db().await;
+        let schema = create_test_schema(db.clone());
+        let existing_email = generate_unique_email("sum_existing");
+        let existing_user =
+            create_test_user_with_password(&db, &existing_email, &valid_password()).await;
+
+        std::env::set_var("SINGLE_USER_MODE", "true");
+
+        let new_email = generate_unique_email("sum_new");
+        let query = format!(
+            r#"mutation {{ signUp(input: {{ email: "{}", password: "{}" }}) {{
+                ... on AuthorizedUser {{ token }}
+                ... on AuthError {{ message }}
+            }} }}"#,
+            new_email,
+            valid_password()
+        );
+
+        let res = schema.execute(Request::new(&query)).await;
+        assert!(res.errors.is_empty(), "Errors: {:?}", res.errors);
+        let data = res.data.into_json().unwrap();
+        assert_eq!(data["signUp"]["message"], "Registration is disabled");
+
+        std::env::remove_var("SINGLE_USER_MODE");
+        cleanup_test_user(&db, existing_user.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_signup_single_user_mode_disabled_allows_signup() {
+        let db = setup_test_db().await;
+        let schema = create_test_schema(db.clone());
+        let email = generate_unique_email("sum_disabled");
+
+        std::env::set_var("SINGLE_USER_MODE", "false");
+
+        let query = format!(
+            r#"mutation {{ signUp(input: {{ email: "{}", password: "{}" }}) {{
+                ... on AuthorizedUser {{ token refreshToken }}
+                ... on AuthError {{ message }}
+            }} }}"#,
+            email,
+            valid_password()
+        );
+
+        let res = schema.execute(Request::new(&query)).await;
+        assert!(res.errors.is_empty(), "Errors: {:?}", res.errors);
+        let data = res.data.into_json().unwrap();
+        assert!(data["signUp"]["token"].as_str().is_some());
+
+        std::env::remove_var("SINGLE_USER_MODE");
         cleanup_test_user_by_email(&db, &email).await;
     }
 
