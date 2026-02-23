@@ -13,10 +13,12 @@ import * as $auth_signin from "./routes/auth/signin.tsx";
 import * as $auth_signup from "./routes/auth/signup.tsx";
 import * as $greet_name_ from "./routes/greet/[name].tsx";
 import * as $index from "./routes/index.tsx";
+import * as $settings from "./routes/settings.tsx";
 import * as $ChangePasswordForm from "./islands/ChangePasswordForm.tsx";
 import * as $QueryProvider from "./islands/QueryProvider.tsx";
 import * as $SignInForm from "./islands/SignInForm.tsx";
 import * as $SignUpForm from "./islands/SignUpForm.tsx";
+import * as $UserSettingsForm from "./islands/UserSettingsForm.tsx";
 import * as $Workspace from "./islands/Workspace.tsx";
 import type { Manifest } from "$fresh/server.ts";
 
@@ -33,12 +35,14 @@ const manifest = {
     "./routes/auth/signup.tsx": $auth_signup,
     "./routes/greet/[name].tsx": $greet_name_,
     "./routes/index.tsx": $index,
+    "./routes/settings.tsx": $settings,
   },
   islands: {
     "./islands/ChangePasswordForm.tsx": $ChangePasswordForm,
     "./islands/QueryProvider.tsx": $QueryProvider,
     "./islands/SignInForm.tsx": $SignInForm,
     "./islands/SignUpForm.tsx": $SignUpForm,
+    "./islands/UserSettingsForm.tsx": $UserSettingsForm,
     "./islands/Workspace.tsx": $Workspace,
   },
   baseUrl: import.meta.url,
