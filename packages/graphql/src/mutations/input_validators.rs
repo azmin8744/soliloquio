@@ -76,6 +76,23 @@ impl InputValidator for ChangePasswordInput {
     }
 }
 
+#[derive(InputObject)]
+pub struct UpdateUserInput {
+    pub email: String,
+}
+
+impl InputValidator for UpdateUserInput {
+    fn validate(&self) -> Result<(), ValidationErrors> {
+        let mut errors = ValidationErrors::new();
+        FieldValidator::validate_email(&self.email, &mut errors);
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
