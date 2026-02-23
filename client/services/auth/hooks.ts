@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { changePassword, getMe, signIn, signUp, updateUser } from "./api.ts";
-import { ChangePasswordInput, SignInInput, SignUpInput, UpdateUserInput } from "./types.ts";
+import {
+  ChangePasswordInput,
+  SignInInput,
+  SignUpInput,
+  UpdateUserInput,
+} from "./types.ts";
 import { authKeys } from "./keys.ts";
 
 export function useSignUp() {

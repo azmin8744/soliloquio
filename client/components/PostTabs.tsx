@@ -118,7 +118,10 @@ export function PostTabs(
           />
           {inputValue && (
             <button
-              onClick={() => { setInputValue(""); onSearchChange(""); }}
+              onClick={() => {
+                setInputValue("");
+                onSearchChange("");
+              }}
               class="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm leading-none"
               aria-label="Clear search"
             >

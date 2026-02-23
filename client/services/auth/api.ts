@@ -119,7 +119,9 @@ export async function changePassword(
   return data.changePassword;
 }
 
-export async function updateUser(input: UpdateUserInput): Promise<UserMutationResult> {
+export async function updateUser(
+  input: UpdateUserInput,
+): Promise<UserMutationResult> {
   const client = getGraphQLClient();
   const data = await client.request<{ updateUser: UserMutationResult }>(
     UPDATE_USER_MUTATION,
