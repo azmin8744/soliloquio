@@ -4,4 +4,7 @@ pub mod prelude;
 
 pub mod posts;
 pub mod refresh_tokens;
+pub mod sea_orm_active_enums;
+pub mod spatial_ref_sys;
 pub mod users;
+pub mod verification_tokens;

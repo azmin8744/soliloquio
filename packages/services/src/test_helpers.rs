@@ -23,6 +23,7 @@ pub async fn create_test_user(
         password: ActiveValue::Set(password.to_string()),
         created_at: ActiveValue::Set(Some(Utc::now().naive_utc())),
         updated_at: ActiveValue::Set(None),
+        ..Default::default()
     };
 
     user.insert(db).await.expect("Failed to create test user")

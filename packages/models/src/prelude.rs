@@ -2,4 +2,6 @@
 
 pub use super::posts::Entity as Posts;
 pub use super::refresh_tokens::Entity as RefreshTokens;
+pub use super::spatial_ref_sys::Entity as SpatialRefSys;
 pub use super::users::Entity as Users;
+pub use super::verification_tokens::Entity as VerificationTokens;

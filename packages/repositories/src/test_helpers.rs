@@ -21,6 +21,7 @@ pub async fn create_test_user(db: &DatabaseConnection, prefix: &str) -> (models:
         password: ActiveValue::Set("hashed".to_string()),
         created_at: ActiveValue::Set(Some(chrono::Utc::now().naive_utc())),
         updated_at: ActiveValue::Set(None),
+        ..Default::default()
     };
 
     let model = user.insert(db).await.expect("Failed to create test user");

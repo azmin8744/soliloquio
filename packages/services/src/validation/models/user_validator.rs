@@ -71,6 +71,7 @@ mod tests {
             password: Set("$argon2id$v=19$m=4096,t=3,p=1$somesalt$hashedpasswordvalue".to_string()),
             created_at: Set(None),
             updated_at: Set(None),
+            ..Default::default()
         };
 
         assert!(valid_user.validate().is_ok());
@@ -82,6 +83,7 @@ mod tests {
             password: Set("ValidP@ssw0rd123".to_string()), // Raw password, not hashed
             created_at: Set(None),
             updated_at: Set(None),
+            ..Default::default()
         };
 
         assert!(unhashed_password.validate().is_err());
@@ -93,6 +95,7 @@ mod tests {
             password: Set("$argon2id$v=19$m=4096,t=3,p=1$somesalt$hashedpasswordvalue".to_string()),
             created_at: Set(None),
             updated_at: Set(None),
+            ..Default::default()
         };
 
         assert!(invalid_email.validate().is_err());
@@ -104,6 +107,7 @@ mod tests {
             password: Set("$argon2id$v=19$m=4096,t=3,p=1$somesalt$hashedpasswordvalue".to_string()),
             created_at: Set(None),
             updated_at: Set(None),
+            ..Default::default()
         };
 
         assert!(malformed_email.validate().is_err());
@@ -127,6 +131,7 @@ mod tests {
                 password: Set(password.to_string()),
                 created_at: Set(None),
                 updated_at: Set(None),
+                ..Default::default()
             };
 
             let is_valid = user.validate().is_ok();
