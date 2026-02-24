@@ -9,6 +9,7 @@ use argon2::{
 };
 use async_graphql::{Context, Result};
 use models::{prelude::*, *};
+use repositories::UserRepository;
 use sea_orm::*;
 use services::authentication::refresh_token::{cleanup_expired_tokens, create_refresh_token};
 use services::authentication::token::generate_token;
@@ -26,11 +27,7 @@ pub(super) async fn sign_in(
         }));
     }
 
-    let user = match Users::find()
-        .filter(users::Column::Email.contains(&input.email))
-        .one(db)
-        .await
-    {
+    let user = match UserRepository::find_by_email_for_login(db, &input.email).await {
         Ok(Some(user)) => user,
         Ok(None) => {
             tracing::warn!("signin failed: email not found");

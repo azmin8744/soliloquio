@@ -8,6 +8,7 @@ use argon2::{
 };
 use async_graphql::{Context, Result};
 use models::{prelude::*, *};
+use repositories::UserRepository;
 use sea_orm::*;
 use services::authentication::refresh_token::{cleanup_expired_tokens, revoke_all_refresh_tokens};
 use services::validation::input_validator::InputValidator;
@@ -87,17 +88,8 @@ pub(super) async fn change_password(
     };
 
     let user_id = current_user.id;
-    let mut user_to_update = current_user.into_active_model();
-    user_to_update.password = ActiveValue::set(new_password_hash);
-    user_to_update.updated_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
-
-    match Users::update(user_to_update).exec(db).await {
-        Ok(_) => {}
-        Err(e) => {
-            return Ok(UserMutationResult::DbError(DbError {
-                message: e.to_string(),
-            }));
-        }
+    if let Err(e) = UserRepository::update_password(db, user_id, new_password_hash).await {
+        return Ok(UserMutationResult::DbError(DbError { message: e.to_string() }));
     }
 
     match revoke_all_refresh_tokens(db, user_id).await {

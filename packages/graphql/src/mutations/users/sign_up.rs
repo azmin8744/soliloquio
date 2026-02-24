@@ -10,6 +10,7 @@ use argon2::{
 };
 use async_graphql::{Context, Result};
 use models::{prelude::*, *};
+use repositories::UserRepository;
 use sea_orm::entity::prelude::Uuid;
 use sea_orm::*;
 use services::authentication::refresh_token::{cleanup_expired_tokens, create_refresh_token};
@@ -32,7 +33,7 @@ pub(super) async fn sign_up(
 
     let single_user_mode = ctx.data::<SingleUserMode>().map(|s| s.0).unwrap_or(false);
     if single_user_mode {
-        let count = Users::find().count(db).await.unwrap_or(0);
+        let count = UserRepository::count(db).await.unwrap_or(0);
         if count >= 1 {
             return Ok(UserMutationResult::AuthError(AuthError {
                 message: "Registration is disabled".to_string(),
@@ -51,14 +52,7 @@ pub(super) async fn sign_up(
         }
     };
 
-    let user = users::ActiveModel {
-        id: ActiveValue::set(Uuid::new_v4()),
-        email: ActiveValue::set(input.email),
-        password: ActiveValue::set(password_hash),
-        ..Default::default()
-    };
-
-    let res = match user.insert(db).await {
+    let res = match UserRepository::create(db, Uuid::new_v4(), input.email, password_hash).await {
         Ok(user) => user,
         Err(e) => {
             tracing::warn!("signup DB error");

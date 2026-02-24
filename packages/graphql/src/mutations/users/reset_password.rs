@@ -6,6 +6,7 @@ use argon2::{
 };
 use async_graphql::{Context, Result};
 use models::{prelude::*, *};
+use repositories::UserRepository;
 use sea_orm::*;
 use services::authentication::refresh_token::{cleanup_expired_tokens, revoke_all_refresh_tokens};
 use services::verification_token::{validate_token, TokenKind};
@@ -45,13 +46,7 @@ pub(super) async fn reset_password(
         }
     };
 
-    let mut user_active = users::ActiveModel {
-        id: ActiveValue::set(record.user_id),
-        ..Default::default()
-    };
-    user_active.password = ActiveValue::set(new_hash);
-    user_active.updated_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
-    if let Err(e) = Users::update(user_active).exec(db).await {
+    if let Err(e) = UserRepository::update_password(db, record.user_id, new_hash).await {
         return Ok(UserMutationResult::DbError(DbError { message: e.to_string() }));
     }
 

@@ -5,6 +5,7 @@ use crate::types::user::User;
 use crate::utilities::requires_auth::RequiresAuth;
 use async_graphql::{Context, Result};
 use models::{prelude::*, *};
+use repositories::UserRepository;
 use sea_orm::*;
 use services::email::EmailService;
 use services::validation::input_validator::InputValidator;
@@ -28,11 +29,7 @@ pub(super) async fn update_user(
         }));
     }
 
-    if let Ok(Some(existing)) = Users::find()
-        .filter(users::Column::Email.eq(&input.email))
-        .one(db)
-        .await
-    {
+    if let Ok(Some(existing)) = UserRepository::find_by_email(db, &input.email).await {
         if existing.id != current_user.id {
             return Ok(UserMutationResult::AuthError(AuthError {
                 message: "Email already in use".to_string(),
@@ -42,14 +39,7 @@ pub(super) async fn update_user(
 
     let user_id = current_user.id;
     let email_changed = current_user.email != input.email;
-    let mut user_active = current_user.into_active_model();
-    user_active.email = ActiveValue::set(input.email.clone());
-    user_active.updated_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
-    if email_changed {
-        user_active.email_verified_at = ActiveValue::set(None);
-    }
-
-    let updated = match Users::update(user_active).exec(db).await {
+    let updated = match UserRepository::update_email(db, current_user, input.email.clone(), email_changed).await {
         Ok(u) => u,
         Err(e) => return Ok(UserMutationResult::DbError(DbError { message: e.to_string() })),
     };
