@@ -9,3 +9,9 @@ services:
     environment:
       POSTGRES_PASSWORD:
       POSTGRES_HOST_AUTH_METHOD: 'trust'
+
+  mailcatcher:
+    image: sj26/mailcatcher
+    ports:
+      - "1025:1025"
+      - "1080:1080"
