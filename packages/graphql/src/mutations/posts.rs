@@ -89,6 +89,11 @@ impl PostMutations for PostMutation {
                 }));
             }
         };
+        if user.email_verified_at.is_none() {
+            return Ok(PostMutationResult::AuthError(AuthError {
+                message: "Email not verified".to_string(),
+            }));
+        }
 
         let db = ctx.data::<DatabaseConnection>().unwrap();
         let is_published = new_post.is_published.unwrap_or(false);
@@ -125,6 +130,11 @@ impl PostMutations for PostMutation {
                 }));
             }
         };
+        if user.email_verified_at.is_none() {
+            return Ok(PostMutationResult::AuthError(AuthError {
+                message: "Email not verified".to_string(),
+            }));
+        }
 
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
@@ -163,6 +173,11 @@ impl PostMutations for PostMutation {
                 }));
             }
         };
+        if user.email_verified_at.is_none() {
+            return Ok(PostMutationResult::AuthError(AuthError {
+                message: "Email not verified".to_string(),
+            }));
+        }
 
         let db = ctx.data::<DatabaseConnection>().unwrap();
 

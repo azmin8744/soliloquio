@@ -4,11 +4,13 @@ use async_graphql::{http::GraphiQLSource, Schema};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 use tracing_actix_web::TracingLogger;
 mod setup;
+use graphql::config::SingleUserMode;
 use graphql::mutations::Mutations as MutationRoot;
 use graphql::queries::Queries as QueryRoot;
 use graphql::subscriptions::{on_connection_init, Subscriptions as SubscriptionRoot};
 use graphql::utilities::MarkdownCache;
 use services::authentication::Token;
+use services::email::EmailService;
 use setup::set_up_db;
 
 type SchemaType = Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
@@ -94,14 +96,22 @@ async fn main() -> std::io::Result<()> {
     };
 
     let markdown_cache = MarkdownCache::new();
+    let email_service = EmailService::from_env();
+    let single_user_mode = SingleUserMode(
+        std::env::var("SINGLE_USER_MODE")
+            .unwrap_or_default()
+            .eq_ignore_ascii_case("true"),
+    );
 
     let schema = Schema::build(
         QueryRoot::default(),
         MutationRoot::default(),
         SubscriptionRoot,
     )
-    .data(db) // Add the database connection to the GraphQL global context
-    .data(markdown_cache) // Add the markdown cache to the GraphQL global context
+    .data(db)
+    .data(markdown_cache)
+    .data(email_service)
+    .data(single_user_mode)
     .finish();
 
     tracing::info!("GraphiQL IDE: http://localhost:8000");

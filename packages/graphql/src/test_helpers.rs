@@ -4,6 +4,7 @@ use models::users;
 use sea_orm::*;
 use uuid::Uuid;
 
+use crate::config::SingleUserMode;
 use crate::mutations::Mutations;
 use crate::queries::Queries;
 use crate::utilities::MarkdownCache;
@@ -24,6 +25,16 @@ pub fn create_test_schema(db: DatabaseConnection) -> TestSchema {
     Schema::build(Queries::default(), Mutations::default(), EmptySubscription)
         .data(db)
         .data(markdown_cache)
+        .data(SingleUserMode(false))
+        .finish()
+}
+
+pub fn create_test_schema_single_user(db: DatabaseConnection) -> TestSchema {
+    let markdown_cache = MarkdownCache::new();
+    Schema::build(Queries::default(), Mutations::default(), EmptySubscription)
+        .data(db)
+        .data(markdown_cache)
+        .data(SingleUserMode(true))
         .finish()
 }
 
@@ -50,6 +61,7 @@ pub async fn create_test_user_with_password(
         password: ActiveValue::Set(password_hash),
         created_at: ActiveValue::Set(Some(Utc::now().naive_utc())),
         updated_at: ActiveValue::Set(None),
+        ..Default::default()
     };
 
     user.insert(db).await.expect("Failed to create test user")

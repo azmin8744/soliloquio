@@ -1,3 +1,4 @@
+use crate::config::SingleUserMode;
 use crate::errors::{AuthError, DbError, ValidationErrorType};
 use crate::mutations::input_validators::{ChangePasswordInput, SignInInput, SignUpInput, UpdateUserInput};
 use crate::types::user::User;
@@ -17,10 +18,22 @@ use services::authentication::refresh_token::{
     validate_refresh_token,
 };
 use services::authentication::token::{generate_token, Token};
+use services::email::EmailService;
 use services::validation::input_validator::InputValidator;
+use services::verification_token::{TokenKind, cleanup_expired, create_token, validate_token};
 
 #[derive(SimpleObject)]
 pub struct PasswordChangeSuccess {
+    message: String,
+}
+
+#[derive(SimpleObject)]
+pub struct PasswordResetSuccess {
+    message: String,
+}
+
+#[derive(SimpleObject)]
+pub struct EmailVerifySuccess {
     message: String,
 }
 
@@ -31,6 +44,8 @@ pub enum UserMutationResult {
     DbError(DbError),
     AuthError(AuthError),
     PasswordChangeSuccess(PasswordChangeSuccess),
+    PasswordResetSuccess(PasswordResetSuccess),
+    EmailVerifySuccess(EmailVerifySuccess),
     User(User),
 }
 
@@ -75,6 +90,15 @@ trait UserMutations {
         ctx: &Context<'_>,
         access_token: String,
     ) -> Result<bool, AuthError>;
+    async fn forgot_password(&self, ctx: &Context<'_>, email: String) -> Result<UserMutationResult>;
+    async fn reset_password(
+        &self,
+        ctx: &Context<'_>,
+        token: String,
+        new_password: String,
+    ) -> Result<UserMutationResult>;
+    async fn verify_email(&self, ctx: &Context<'_>, token: String) -> Result<UserMutationResult>;
+    async fn resend_verification_email(&self, ctx: &Context<'_>) -> Result<UserMutationResult>;
 }
 
 #[Object]
@@ -90,10 +114,8 @@ impl UserMutations for UserMutation {
         }
 
         // Single user mode: reject if a user already exists
-        if std::env::var("SINGLE_USER_MODE")
-            .unwrap_or_default()
-            .eq_ignore_ascii_case("true")
-        {
+        let single_user_mode = ctx.data::<SingleUserMode>().map(|s| s.0).unwrap_or(false);
+        if single_user_mode {
             let count = Users::find().count(db).await.unwrap_or(0);
             if count >= 1 {
                 return Ok(UserMutationResult::AuthError(AuthError {
@@ -143,6 +165,18 @@ impl UserMutations for UserMutation {
         };
 
         let _ = cleanup_expired_tokens(db).await;
+
+        // Send verification email (best-effort)
+        if let Ok(email_service) = ctx.data::<EmailService>() {
+            match create_token(db, res.id, TokenKind::EmailVerification, 86400).await {
+                Ok(raw_token) => {
+                    if let Err(e) = email_service.send_email_verification(&res.email, &raw_token).await {
+                        tracing::warn!(user_id = %res.id, error = %e, "failed to send verification email");
+                    }
+                }
+                Err(e) => tracing::warn!(user_id = %res.id, error = %e.message, "failed to create verification token"),
+            }
+        }
 
         let access_token = generate_token(&res);
 
@@ -413,19 +447,38 @@ impl UserMutations for UserMutation {
         }
 
         let user_id = current_user.id;
+        let email_changed = current_user.email != input.email;
         let mut user_active = current_user.into_active_model();
-        user_active.email = ActiveValue::set(input.email);
+        user_active.email = ActiveValue::set(input.email.clone());
         user_active.updated_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
+        if email_changed {
+            user_active.email_verified_at = ActiveValue::set(None);
+        }
 
         let updated = match Users::update(user_active).exec(db).await {
             Ok(u) => u,
             Err(e) => return Ok(UserMutationResult::DbError(DbError { message: e.to_string() })),
         };
 
+        // Send new verification email on email change (best-effort)
+        if email_changed {
+            if let Ok(email_service) = ctx.data::<EmailService>() {
+                match create_token(db, user_id, TokenKind::EmailVerification, 86400).await {
+                    Ok(raw_token) => {
+                        if let Err(e) = email_service.send_email_verification(&input.email, &raw_token).await {
+                            tracing::warn!(user_id = %user_id, error = %e, "failed to send verification email after email change");
+                        }
+                    }
+                    Err(e) => tracing::warn!(user_id = %user_id, error = %e.message, "failed to create verification token"),
+                }
+            }
+        }
+
         tracing::info!(user_id = %user_id, "user email updated");
         Ok(UserMutationResult::User(User {
             id: updated.id,
             email: updated.email,
+            email_verified_at: updated.email_verified_at,
             created_at: updated.created_at,
             updated_at: updated.updated_at,
         }))
@@ -542,6 +595,141 @@ impl UserMutations for UserMutation {
         tracing::info!(user_id = %user_id, "password changed");
         Ok(UserMutationResult::PasswordChangeSuccess(PasswordChangeSuccess {
             message: "Password changed successfully. Please sign in again on other devices.".to_string(),
+        }))
+    }
+
+    async fn forgot_password(&self, ctx: &Context<'_>, email: String) -> Result<UserMutationResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+        let ok = UserMutationResult::PasswordResetSuccess(PasswordResetSuccess {
+            message: "If that email exists, a reset link was sent".to_string(),
+        });
+
+        let user = match Users::find()
+            .filter(users::Column::Email.eq(&email))
+            .one(db)
+            .await
+        {
+            Ok(Some(u)) => u,
+            Ok(None) => return Ok(ok), // don't reveal email existence
+            Err(e) => return Ok(UserMutationResult::DbError(DbError { message: e.to_string() })),
+        };
+
+        if let Ok(email_service) = ctx.data::<EmailService>() {
+            match create_token(db, user.id, TokenKind::PasswordReset, 3600).await {
+                Ok(raw_token) => {
+                    if let Err(e) = email_service.send_password_reset(&email, &raw_token).await {
+                        tracing::warn!(user_id = %user.id, error = %e, "failed to send password reset email");
+                    }
+                }
+                Err(e) => tracing::warn!(user_id = %user.id, error = %e.message, "failed to create reset token"),
+            }
+        }
+
+        Ok(ok)
+    }
+
+    async fn reset_password(
+        &self,
+        ctx: &Context<'_>,
+        token: String,
+        new_password: String,
+    ) -> Result<UserMutationResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        let record = match validate_token(db, &token, TokenKind::PasswordReset).await {
+            Ok(r) => r,
+            Err(e) => return Ok(UserMutationResult::AuthError(AuthError { message: e.message })),
+        };
+
+        // Validate new password strength
+        let temp_user = users::ActiveModel {
+            id: ActiveValue::set(record.user_id),
+            email: ActiveValue::set("placeholder@example.com".to_string()),
+            password: ActiveValue::set(new_password.clone()),
+            ..Default::default()
+        };
+        use services::validation::ActiveModelValidator;
+        if let Err(e) = temp_user.validate() {
+            return Ok(UserMutationResult::ValidationError(ValidationErrorType { message: e.to_string() }));
+        }
+
+        let salt = SaltString::generate(&mut OsRng);
+        let new_hash = match Argon2::default().hash_password(&new_password.into_bytes(), &salt) {
+            Ok(h) => h.to_string(),
+            Err(_) => return Ok(UserMutationResult::AuthError(AuthError { message: "Failed to hash password".to_string() })),
+        };
+
+        let mut user_active = users::ActiveModel {
+            id: ActiveValue::set(record.user_id),
+            ..Default::default()
+        };
+        user_active.password = ActiveValue::set(new_hash);
+        user_active.updated_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
+        if let Err(e) = Users::update(user_active).exec(db).await {
+            return Ok(UserMutationResult::DbError(DbError { message: e.to_string() }));
+        }
+
+        let _ = revoke_all_refresh_tokens(db, record.user_id).await;
+        let _ = cleanup_expired_tokens(db).await;
+
+        tracing::info!(user_id = %record.user_id, "password reset");
+        Ok(UserMutationResult::PasswordChangeSuccess(PasswordChangeSuccess {
+            message: "Password reset successfully. Please sign in.".to_string(),
+        }))
+    }
+
+    async fn verify_email(&self, ctx: &Context<'_>, token: String) -> Result<UserMutationResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        let record = match validate_token(db, &token, TokenKind::EmailVerification).await {
+            Ok(r) => r,
+            Err(e) => return Ok(UserMutationResult::AuthError(AuthError { message: e.message })),
+        };
+
+        let mut user_active = users::ActiveModel {
+            id: ActiveValue::set(record.user_id),
+            ..Default::default()
+        };
+        user_active.email_verified_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
+        if let Err(e) = Users::update(user_active).exec(db).await {
+            return Ok(UserMutationResult::DbError(DbError { message: e.to_string() }));
+        }
+
+        let _ = cleanup_expired(db).await;
+
+        tracing::info!(user_id = %record.user_id, "email verified");
+        Ok(UserMutationResult::EmailVerifySuccess(EmailVerifySuccess {
+            message: "Email verified successfully".to_string(),
+        }))
+    }
+
+    async fn resend_verification_email(&self, ctx: &Context<'_>) -> Result<UserMutationResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        let user = match self.require_authenticate_as_user(ctx).await {
+            Ok(u) => u,
+            Err(e) => return Ok(UserMutationResult::AuthError(AuthError { message: e.to_string() })),
+        };
+
+        if user.email_verified_at.is_some() {
+            return Ok(UserMutationResult::EmailVerifySuccess(EmailVerifySuccess {
+                message: "Email is already verified".to_string(),
+            }));
+        }
+
+        if let Ok(email_service) = ctx.data::<EmailService>() {
+            match create_token(db, user.id, TokenKind::EmailVerification, 86400).await {
+                Ok(raw_token) => {
+                    if let Err(e) = email_service.send_email_verification(&user.email, &raw_token).await {
+                        tracing::warn!(user_id = %user.id, error = %e, "failed to resend verification email");
+                    }
+                }
+                Err(e) => tracing::warn!(user_id = %user.id, error = %e.message, "failed to create verification token"),
+            }
+        }
+
+        Ok(UserMutationResult::EmailVerifySuccess(EmailVerifySuccess {
+            message: "Verification email sent".to_string(),
         }))
     }
 }
@@ -750,12 +938,10 @@ mod tests {
     #[tokio::test]
     async fn test_signup_single_user_mode_rejects_when_user_exists() {
         let db = setup_test_db().await;
-        let schema = create_test_schema(db.clone());
+        let schema = create_test_schema_single_user(db.clone());
         let existing_email = generate_unique_email("sum_existing");
         let existing_user =
             create_test_user_with_password(&db, &existing_email, &valid_password()).await;
-
-        std::env::set_var("SINGLE_USER_MODE", "true");
 
         let new_email = generate_unique_email("sum_new");
         let query = format!(
@@ -772,7 +958,6 @@ mod tests {
         let data = res.data.into_json().unwrap();
         assert_eq!(data["signUp"]["message"], "Registration is disabled");
 
-        std::env::remove_var("SINGLE_USER_MODE");
         cleanup_test_user(&db, existing_user.id).await;
     }
 
@@ -781,8 +966,6 @@ mod tests {
         let db = setup_test_db().await;
         let schema = create_test_schema(db.clone());
         let email = generate_unique_email("sum_disabled");
-
-        std::env::set_var("SINGLE_USER_MODE", "false");
 
         let query = format!(
             r#"mutation {{ signUp(input: {{ email: "{}", password: "{}" }}) {{
@@ -798,7 +981,6 @@ mod tests {
         let data = res.data.into_json().unwrap();
         assert!(data["signUp"]["token"].as_str().is_some());
 
-        std::env::remove_var("SINGLE_USER_MODE");
         cleanup_test_user_by_email(&db, &email).await;
     }
 
