@@ -102,6 +102,7 @@ const RESET_PASSWORD_MUTATION = `
 const VERIFY_EMAIL_MUTATION = `
   mutation VerifyEmail($token: String!) {
     verifyEmail(token: $token) {
+      __typename
       ... on EmailVerifySuccess { message }
       ... on AuthError { message }
       ... on DbError { message }
