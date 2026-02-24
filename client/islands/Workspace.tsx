@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { getQueryClient } from "../utils/query_client.ts";
-import { useMe } from "../services/auth/hooks.ts";
+import { useMe, useResendVerificationEmail } from "../services/auth/hooks.ts";
 import {
   useCreatePost,
   useDeletePost,
@@ -27,6 +27,7 @@ import type { EditorBuffer } from "../utils/workspace_signals.ts";
 import { useAutoSave } from "../utils/use_auto_save.ts";
 import { PostTabs } from "../components/PostTabs.tsx";
 import { EditorPane } from "../components/EditorPane.tsx";
+import { EmailVerificationBanner } from "../components/EmailVerificationBanner.tsx";
 
 const RECOVERY_KEY = "soliloquio_editor_recovery";
 
@@ -44,6 +45,7 @@ function WorkspaceInner() {
   const createPost = useCreatePost();
   const updatePost = useUpdatePost();
   const deletePost = useDeletePost();
+  const resendMutation = useResendVerificationEmail();
   const [recoveryToast, setRecoveryToast] = useState(false);
 
   // Sync posts query → signal
@@ -190,37 +192,44 @@ function WorkspaceInner() {
   if (!user) return null;
 
   return (
-    <>
-      <PostTabs
-        posts={postsSignal.value}
-        activePostId={activePostId.value}
-        onSelectPost={handleSelectPost}
-        onNewPost={handleNewPost}
-        isCreating={createPost.isPending}
-        onLoadMore={() => fetchNextPage()}
-        hasNextPage={!!hasNextPage}
-        isFetchingNextPage={isFetchingNextPage}
-        sort={currentSort}
-        onSortChange={setSort}
-        search={currentSearch}
-        onSearchChange={setSearch}
-      />
-      <EditorPane
-        editorBuffer={editorBuffer.value}
-        isPreviewToggled={isPreviewToggled.value}
-        activePost={activePost.value}
-        onBufferChange={handleBufferChange}
-        onTogglePreview={() => isPreviewToggled.value = !isPreviewToggled.value}
-        onTogglePublish={() =>
-          handleBufferChange({
-            isPublished: !editorBuffer.value.isPublished,
-          })}
-        onSave={doSave}
-        isSaving={updatePost.isPending}
-        isDirty={isDirty.value}
-        onDelete={handleDelete}
-        isDeleting={deletePost.isPending}
-      />
+    <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
+      {!user.emailVerifiedAt && (
+        <EmailVerificationBanner resendMutation={resendMutation} />
+      )}
+      <div class="flex flex-1 min-h-0">
+        <PostTabs
+          posts={postsSignal.value}
+          activePostId={activePostId.value}
+          onSelectPost={handleSelectPost}
+          onNewPost={handleNewPost}
+          isCreating={createPost.isPending}
+          onLoadMore={() => fetchNextPage()}
+          hasNextPage={!!hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          sort={currentSort}
+          onSortChange={setSort}
+          search={currentSearch}
+          onSearchChange={setSearch}
+          emailVerified={!!user.emailVerifiedAt}
+        />
+        <EditorPane
+          editorBuffer={editorBuffer.value}
+          isPreviewToggled={isPreviewToggled.value}
+          activePost={activePost.value}
+          onBufferChange={handleBufferChange}
+          onTogglePreview={() =>
+            isPreviewToggled.value = !isPreviewToggled.value}
+          onTogglePublish={() =>
+            handleBufferChange({
+              isPublished: !editorBuffer.value.isPublished,
+            })}
+          onSave={doSave}
+          isSaving={updatePost.isPending}
+          isDirty={isDirty.value}
+          onDelete={handleDelete}
+          isDeleting={deletePost.isPending}
+        />
+      </div>
 
       {/* Recovery toast */}
       {recoveryToast && (
@@ -244,7 +253,7 @@ function WorkspaceInner() {
           </button>
         </div>
       )}
-    </>
+    </div>
   );
 }
 

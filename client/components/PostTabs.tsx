@@ -38,6 +38,7 @@ interface PostTabsProps {
   onSortChange: (sort: PostSortParams) => void;
   search: string;
   onSearchChange: (q: string) => void;
+  emailVerified: boolean;
 }
 
 export function PostTabs(
@@ -54,6 +55,7 @@ export function PostTabs(
     onSortChange,
     search,
     onSearchChange,
+    emailVerified,
   }: PostTabsProps,
 ) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -102,7 +104,8 @@ export function PostTabs(
       <div class="p-3 border-b border-gray-200 space-y-2">
         <button
           onClick={onNewPost}
-          disabled={isCreating}
+          disabled={isCreating || !emailVerified}
+          title={!emailVerified ? "Verify your email to create posts" : undefined}
           class="w-full px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
         >
           {isCreating ? "Creating..." : "+ New Post"}
