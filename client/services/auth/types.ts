@@ -1,6 +1,8 @@
 import {
   AuthorizedUser,
+  EmailVerifySuccess,
   PasswordChangeSuccess,
+  PasswordResetSuccess,
   User,
   ValidationErrorType,
 } from "../../domains/users.ts";
@@ -31,4 +33,6 @@ export type UserMutationResult =
   | DbError
   | AuthError
   | PasswordChangeSuccess
+  | PasswordResetSuccess
+  | EmailVerifySuccess
   | User;

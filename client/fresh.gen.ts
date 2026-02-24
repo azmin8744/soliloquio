@@ -10,18 +10,24 @@ import * as $api_auth_me from "./routes/api/auth/me.ts";
 import * as $api_auth_refresh from "./routes/api/auth/refresh.ts";
 import * as $api_graphql from "./routes/api/graphql.ts";
 import * as $auth_change_password from "./routes/auth/change_password.tsx";
+import * as $auth_forgot_password from "./routes/auth/forgot_password.tsx";
+import * as $auth_reset_password from "./routes/auth/reset_password.tsx";
 import * as $auth_signin from "./routes/auth/signin.tsx";
 import * as $auth_signup from "./routes/auth/signup.tsx";
+import * as $auth_verify_email from "./routes/auth/verify_email.tsx";
 import * as $greet_name_ from "./routes/greet/[name].tsx";
 import * as $index from "./routes/index.tsx";
 import * as $posts from "./routes/posts.tsx";
 import * as $settings from "./routes/settings.tsx";
 import * as $ChangePasswordForm from "./islands/ChangePasswordForm.tsx";
+import * as $ForgotPasswordForm from "./islands/ForgotPasswordForm.tsx";
 import * as $NavRailIsland from "./islands/NavRailIsland.tsx";
 import * as $QueryProvider from "./islands/QueryProvider.tsx";
+import * as $ResetPasswordForm from "./islands/ResetPasswordForm.tsx";
 import * as $SignInForm from "./islands/SignInForm.tsx";
 import * as $SignUpForm from "./islands/SignUpForm.tsx";
 import * as $UserSettingsForm from "./islands/UserSettingsForm.tsx";
+import * as $VerifyEmailHandler from "./islands/VerifyEmailHandler.tsx";
 import * as $Workspace from "./islands/Workspace.tsx";
 import type { Manifest } from "$fresh/server.ts";
 
@@ -35,8 +41,11 @@ const manifest = {
     "./routes/api/auth/refresh.ts": $api_auth_refresh,
     "./routes/api/graphql.ts": $api_graphql,
     "./routes/auth/change_password.tsx": $auth_change_password,
+    "./routes/auth/forgot_password.tsx": $auth_forgot_password,
+    "./routes/auth/reset_password.tsx": $auth_reset_password,
     "./routes/auth/signin.tsx": $auth_signin,
     "./routes/auth/signup.tsx": $auth_signup,
+    "./routes/auth/verify_email.tsx": $auth_verify_email,
     "./routes/greet/[name].tsx": $greet_name_,
     "./routes/index.tsx": $index,
     "./routes/posts.tsx": $posts,
@@ -44,11 +53,14 @@ const manifest = {
   },
   islands: {
     "./islands/ChangePasswordForm.tsx": $ChangePasswordForm,
+    "./islands/ForgotPasswordForm.tsx": $ForgotPasswordForm,
     "./islands/NavRailIsland.tsx": $NavRailIsland,
     "./islands/QueryProvider.tsx": $QueryProvider,
+    "./islands/ResetPasswordForm.tsx": $ResetPasswordForm,
     "./islands/SignInForm.tsx": $SignInForm,
     "./islands/SignUpForm.tsx": $SignUpForm,
     "./islands/UserSettingsForm.tsx": $UserSettingsForm,
+    "./islands/VerifyEmailHandler.tsx": $VerifyEmailHandler,
     "./islands/Workspace.tsx": $Workspace,
   },
   baseUrl: import.meta.url,

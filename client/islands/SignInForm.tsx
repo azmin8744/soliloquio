@@ -68,6 +68,15 @@ function SignInFormContent() {
         </div>
       )}
 
+      <div class="flex items-center justify-end">
+        <a
+          href="/auth/forgot_password"
+          class="text-sm text-blue-600 hover:text-blue-500"
+        >
+          Forgot password?
+        </a>
+      </div>
+
       <div>
         <Button
           type="submit"

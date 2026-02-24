@@ -3,6 +3,7 @@ import { NaiveDateTime, UUID } from "./common.ts";
 export interface User {
   id: UUID;
   email: string;
+  emailVerifiedAt?: NaiveDateTime;
   createdAt?: NaiveDateTime;
   updatedAt?: NaiveDateTime;
 }
@@ -13,6 +14,14 @@ export interface AuthorizedUser {
 }
 
 export interface PasswordChangeSuccess {
+  message: string;
+}
+
+export interface PasswordResetSuccess {
+  message: string;
+}
+
+export interface EmailVerifySuccess {
   message: string;
 }
 

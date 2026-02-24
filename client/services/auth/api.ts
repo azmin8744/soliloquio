@@ -79,11 +79,51 @@ const UPDATE_USER_MUTATION = `
   }
 `;
 
+const FORGOT_PASSWORD_MUTATION = `
+  mutation ForgotPassword($email: String!) {
+    forgotPassword(email: $email) {
+      ... on PasswordResetSuccess { message }
+      ... on DbError { message }
+    }
+  }
+`;
+
+const RESET_PASSWORD_MUTATION = `
+  mutation ResetPassword($token: String!, $newPassword: String!) {
+    resetPassword(token: $token, newPassword: $newPassword) {
+      ... on PasswordChangeSuccess { message }
+      ... on ValidationErrorType { message }
+      ... on AuthError { message }
+      ... on DbError { message }
+    }
+  }
+`;
+
+const VERIFY_EMAIL_MUTATION = `
+  mutation VerifyEmail($token: String!) {
+    verifyEmail(token: $token) {
+      ... on EmailVerifySuccess { message }
+      ... on AuthError { message }
+      ... on DbError { message }
+    }
+  }
+`;
+
+const RESEND_VERIFICATION_MUTATION = `
+  mutation ResendVerificationEmail {
+    resendVerificationEmail {
+      ... on EmailVerifySuccess { message }
+      ... on AuthError { message }
+    }
+  }
+`;
+
 const ME_QUERY = `
   query Me {
     me {
       id
       email
+      emailVerifiedAt
       createdAt
       updatedAt
     }
@@ -128,6 +168,48 @@ export async function updateUser(
     { input },
   );
   return data.updateUser;
+}
+
+export async function forgotPassword(
+  email: string,
+): Promise<UserMutationResult> {
+  const client = getGraphQLClient();
+  const data = await client.request<{ forgotPassword: UserMutationResult }>(
+    FORGOT_PASSWORD_MUTATION,
+    { email },
+  );
+  return data.forgotPassword;
+}
+
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<UserMutationResult> {
+  const client = getGraphQLClient();
+  const data = await client.request<{ resetPassword: UserMutationResult }>(
+    RESET_PASSWORD_MUTATION,
+    { token, newPassword },
+  );
+  return data.resetPassword;
+}
+
+export async function verifyEmail(token: string): Promise<UserMutationResult> {
+  const client = getGraphQLClient();
+  const data = await client.request<{ verifyEmail: UserMutationResult }>(
+    VERIFY_EMAIL_MUTATION,
+    { token },
+  );
+  return data.verifyEmail;
+}
+
+export async function resendVerificationEmail(): Promise<UserMutationResult> {
+  const client = getGraphQLClient();
+  const data = await client.request<
+    { resendVerificationEmail: UserMutationResult }
+  >(
+    RESEND_VERIFICATION_MUTATION,
+  );
+  return data.resendVerificationEmail;
 }
 
 export async function getMe(): Promise<User | null> {

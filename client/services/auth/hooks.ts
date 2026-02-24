@@ -1,5 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { changePassword, getMe, signIn, signUp, updateUser } from "./api.ts";
+import {
+  changePassword,
+  forgotPassword,
+  getMe,
+  resendVerificationEmail,
+  resetPassword,
+  signIn,
+  signUp,
+  updateUser,
+  verifyEmail,
+} from "./api.ts";
 import {
   ChangePasswordInput,
   SignInInput,
@@ -72,6 +82,32 @@ export function useLogout() {
       queryClient.setQueryData(authKeys.user(), null);
       queryClient.invalidateQueries({ queryKey: authKeys.user() });
     },
+  });
+}
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: (email: string) => forgotPassword(email),
+  });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (
+      { token, newPassword }: { token: string; newPassword: string },
+    ) => resetPassword(token, newPassword),
+  });
+}
+
+export function useVerifyEmail() {
+  return useMutation({
+    mutationFn: (token: string) => verifyEmail(token),
+  });
+}
+
+export function useResendVerificationEmail() {
+  return useMutation({
+    mutationFn: () => resendVerificationEmail(),
   });
 }
 

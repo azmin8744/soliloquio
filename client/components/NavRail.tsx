@@ -18,15 +18,13 @@ interface NavRailLinkProps {
   children: ComponentChildren;
 }
 
-export function NavRailLink({ href, active, title, children }: NavRailLinkProps) {
+export function NavRailLink(
+  { href, active, title, children }: NavRailLinkProps,
+) {
   if (active) {
-    return (
-      <span class={NavRailPanel(true)} title={title}>{children}</span>
-    );
+    return <span class={NavRailPanel(true)} title={title}>{children}</span>;
   }
-  return (
-    <a href={href} class={NavRailPanel()} title={title}>{children}</a>
-  );
+  return <a href={href} class={NavRailPanel()} title={title}>{children}</a>;
 }
 
 interface NavRailButtonProps {
@@ -107,8 +105,14 @@ export function NavRail(
   return (
     <div class="w-16 bg-gray-900 flex flex-col items-center py-4 flex-shrink-0">
       <div class="flex flex-col items-center gap-1">
-        <div class="text-white font-bold text-lg mb-2" title="Soliloquio">S</div>
-        <NavRailLink href="/posts" active={activePage === "posts"} title="Posts">
+        <div class="text-white font-bold text-lg mb-2" title="Soliloquio">
+          S
+        </div>
+        <NavRailLink
+          href="/posts"
+          active={activePage === "posts"}
+          title="Posts"
+        >
           <PostsIcon />
         </NavRailLink>
       </div>
