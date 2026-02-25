@@ -4,7 +4,6 @@ use crate::mutations::input_validators::UpdateUserInput;
 use crate::types::user::User;
 use crate::utilities::requires_auth::RequiresAuth;
 use async_graphql::{Context, Result};
-use models::{prelude::*, *};
 use repositories::UserRepository;
 use sea_orm::*;
 use services::email::EmailService;

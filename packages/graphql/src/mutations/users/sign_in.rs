@@ -8,7 +8,6 @@ use argon2::{
     Argon2,
 };
 use async_graphql::{Context, Result};
-use models::{prelude::*, *};
 use repositories::UserRepository;
 use sea_orm::*;
 use services::authentication::refresh_token::{cleanup_expired_tokens, create_refresh_token};

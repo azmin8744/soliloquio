@@ -1,7 +1,7 @@
 use async_graphql::InputObject;
 use services::validation::field_validators::FieldValidator;
 use services::validation::input_validator::{
-    InputValidator, ValidationErrors, ValidationErrorsExt,
+    InputValidator, ValidationErrors
 };
 
 #[derive(InputObject)]

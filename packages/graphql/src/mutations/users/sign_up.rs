@@ -9,7 +9,6 @@ use argon2::{
     Argon2,
 };
 use async_graphql::{Context, Result};
-use models::{prelude::*, *};
 use repositories::UserRepository;
 use sea_orm::entity::prelude::Uuid;
 use sea_orm::*;
@@ -118,6 +117,8 @@ mod tests {
     use crate::test_helpers::*;
     use async_graphql::Request;
     use models::refresh_tokens::{self, Entity as RefreshTokens};
+    use models::prelude::Users;
+    use models::users;
 
     #[tokio::test]
     async fn test_signup_valid_input_creates_user() {
