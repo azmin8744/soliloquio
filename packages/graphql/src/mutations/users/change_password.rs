@@ -7,7 +7,6 @@ use argon2::{
     Argon2,
 };
 use async_graphql::{Context, Result};
-use models::{prelude::*, *};
 use repositories::UserRepository;
 use sea_orm::*;
 use services::authentication::refresh_token::{cleanup_expired_tokens, revoke_all_refresh_tokens};
@@ -50,20 +49,6 @@ pub(super) async fn change_password(
     {
         return Ok(UserMutationResult::ValidationError(ValidationErrorType {
             message: "Current password is incorrect".to_string(),
-        }));
-    }
-
-    let temp_user = users::ActiveModel {
-        id: ActiveValue::set(current_user.id),
-        email: ActiveValue::set(current_user.email.clone()),
-        password: ActiveValue::set(input.new_password.clone()),
-        ..Default::default()
-    };
-
-    use services::validation::ActiveModelValidator;
-    if let Err(validation_error) = temp_user.validate() {
-        return Ok(UserMutationResult::ValidationError(ValidationErrorType {
-            message: validation_error.to_string(),
         }));
     }
 

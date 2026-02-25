@@ -1,11 +1,10 @@
 use super::{PasswordChangeSuccess, UserMutationResult};
-use crate::errors::{AuthError, DbError, ValidationErrorType};
+use crate::errors::{AuthError, DbError};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2,
 };
 use async_graphql::{Context, Result};
-use models::{prelude::*, *};
 use repositories::UserRepository;
 use sea_orm::*;
 use services::authentication::refresh_token::{cleanup_expired_tokens, revoke_all_refresh_tokens};
@@ -22,19 +21,6 @@ pub(super) async fn reset_password(
         Ok(r) => r,
         Err(e) => return Ok(UserMutationResult::AuthError(AuthError { message: e.message })),
     };
-
-    let temp_user = users::ActiveModel {
-        id: ActiveValue::set(record.user_id),
-        email: ActiveValue::set("placeholder@example.com".to_string()),
-        password: ActiveValue::set(new_password.clone()),
-        ..Default::default()
-    };
-    use services::validation::ActiveModelValidator;
-    if let Err(e) = temp_user.validate() {
-        return Ok(UserMutationResult::ValidationError(ValidationErrorType {
-            message: e.to_string(),
-        }));
-    }
 
     let salt = SaltString::generate(&mut OsRng);
     let new_hash = match Argon2::default().hash_password(&new_password.into_bytes(), &salt) {

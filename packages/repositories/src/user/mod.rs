@@ -3,6 +3,7 @@ use data_access_objects::UserDao;
 use models::users::{ActiveModel, Model};
 use sea_orm::entity::prelude::Uuid;
 use sea_orm::*;
+use services::validation::ActiveModelValidator;
 
 pub struct UserRepository;
 
@@ -16,14 +17,17 @@ impl UserRepository {
         id: Uuid,
         email: String,
         password_hash: String,
-    ) -> Result<Model, DbErr> {
+    ) -> Result<Model, String> {
         let model = ActiveModel {
             id: ActiveValue::set(id),
             email: ActiveValue::set(email),
             password: ActiveValue::set(password_hash),
             ..Default::default()
         };
-        UserDao::insert(db, model).await
+        if let Err(e) = model.validate() {
+            return Err(e.to_string());
+        }
+        UserDao::insert(db, model).await.map_err(|e| e.to_string())
     }
 
     pub async fn find_by_email(
@@ -44,14 +48,17 @@ impl UserRepository {
         db: &DatabaseConnection,
         user_id: Uuid,
         new_hash: String,
-    ) -> Result<Model, DbErr> {
+    ) -> Result<Model, String> {
         let model = ActiveModel {
             id: ActiveValue::set(user_id),
             password: ActiveValue::set(new_hash),
             updated_at: ActiveValue::set(Some(chrono::Utc::now().naive_utc())),
             ..Default::default()
         };
-        UserDao::update(db, model).await
+        if let Err(e) = model.validate() {
+            return Err(e.to_string());
+        }
+        UserDao::update(db, model).await.map_err(|e| e.to_string())
     }
 
     pub async fn update_email(
@@ -59,14 +66,17 @@ impl UserRepository {
         user: Model,
         new_email: String,
         reset_verified: bool,
-    ) -> Result<Model, DbErr> {
+    ) -> Result<Model, String> {
         let mut model = user.into_active_model();
         model.email = ActiveValue::set(new_email);
         model.updated_at = ActiveValue::set(Some(Utc::now().naive_utc()));
         if reset_verified {
             model.email_verified_at = ActiveValue::set(None);
         }
-        UserDao::update(db, model).await
+        if let Err(e) = model.validate() {
+            return Err(e.to_string());
+        }
+        UserDao::update(db, model).await.map_err(|e| e.to_string())
     }
 }
 
@@ -76,19 +86,21 @@ mod tests {
     use crate::test_helpers::*;
     use uuid::Uuid;
 
+    const FAKE_HASH: &str = "$argon2id$v=19$m=4096,t=3,p=1$c29tZXNhbHQ$ZmFrZWhhc2g";
+
     #[tokio::test]
     async fn test_create_stores_fields() {
         let db = setup_test_db().await;
         let id = Uuid::new_v4();
         let email = format!("user_create_{}@example.com", Uuid::new_v4());
 
-        let user = UserRepository::create(&db, id, email.clone(), "hash123".to_string())
+        let user = UserRepository::create(&db, id, email.clone(), FAKE_HASH.to_string())
             .await
             .unwrap();
 
         assert_eq!(user.id, id);
         assert_eq!(user.email, email);
-        assert_eq!(user.password, "hash123");
+        assert_eq!(user.password, FAKE_HASH);
 
         cleanup_user_by_email(&db, &email).await;
     }
@@ -99,7 +111,7 @@ mod tests {
         let email = format!("user_count_{}@example.com", Uuid::new_v4());
 
         let before = UserRepository::count(&db).await.unwrap();
-        UserRepository::create(&db, Uuid::new_v4(), email.clone(), "hash".to_string())
+        UserRepository::create(&db, Uuid::new_v4(), email.clone(), FAKE_HASH.to_string())
             .await
             .unwrap();
         let after = UserRepository::count(&db).await.unwrap();
@@ -184,11 +196,12 @@ mod tests {
         let db = setup_test_db().await;
         let (user, email) = create_test_user(&db, "upd_pw").await;
 
-        let updated = UserRepository::update_password(&db, user.id, "new_hash".to_string())
+        let new_hash = "$argon2id$v=19$m=4096,t=3,p=1$c29tZXNhbHQ$bmV3aGFzaA";
+        let updated = UserRepository::update_password(&db, user.id, new_hash.to_string())
             .await
             .unwrap();
 
-        assert_eq!(updated.password, "new_hash");
+        assert_eq!(updated.password, new_hash);
 
         cleanup_user_by_email(&db, &email).await;
     }
@@ -200,7 +213,7 @@ mod tests {
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
-        let updated = UserRepository::update_password(&db, user.id, "hash2".to_string())
+        let updated = UserRepository::update_password(&db, user.id, FAKE_HASH.to_string())
             .await
             .unwrap();
 
