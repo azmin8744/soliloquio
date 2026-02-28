@@ -59,13 +59,25 @@ pub(super) async fn update_user(
         }
     }
 
-    tracing::info!(user_id = %user_id, "user email updated");
+    let has_profile_update = input.display_name.is_some() || input.bio.is_some();
+    let final_user = if has_profile_update {
+        match UserRepository::update_profile(db, user_id, input.display_name, input.bio).await {
+            Ok(u) => u,
+            Err(e) => return Ok(UserMutationResult::DbError(DbError { message: e.to_string() })),
+        }
+    } else {
+        updated
+    };
+
+    tracing::info!(user_id = %user_id, "user updated");
     Ok(UserMutationResult::User(User {
-        id: updated.id,
-        email: updated.email,
-        email_verified_at: updated.email_verified_at,
-        created_at: updated.created_at,
-        updated_at: updated.updated_at,
+        id: final_user.id,
+        email: final_user.email,
+        email_verified_at: final_user.email_verified_at,
+        display_name: final_user.display_name,
+        bio: final_user.bio,
+        created_at: final_user.created_at,
+        updated_at: final_user.updated_at,
     }))
 }
 
@@ -165,5 +177,57 @@ mod tests {
 
         cleanup_test_user(&db, user1.id).await;
         cleanup_test_user(&db, user2.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_user_updates_display_name() {
+        let db = setup_test_db().await;
+        let schema = create_test_schema(db.clone());
+        let email = generate_unique_email("update_display_name");
+        let user = create_test_user_with_password(&db, &email, &valid_password()).await;
+        let token = create_access_token(&user);
+
+        let query = format!(
+            r#"mutation {{ updateUser(input: {{ email: "{}", displayName: "Test Name" }}) {{
+                ... on User {{ displayName bio }}
+                ... on AuthError {{ message }}
+            }} }}"#,
+            email
+        );
+
+        let res = schema
+            .execute(Request::new(&query).data(services::authentication::Token::new(token)))
+            .await;
+        assert!(res.errors.is_empty(), "Errors: {:?}", res.errors);
+        let data = res.data.into_json().unwrap();
+        assert_eq!(data["updateUser"]["displayName"], "Test Name");
+
+        cleanup_test_user(&db, user.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_user_updates_bio() {
+        let db = setup_test_db().await;
+        let schema = create_test_schema(db.clone());
+        let email = generate_unique_email("update_bio");
+        let user = create_test_user_with_password(&db, &email, &valid_password()).await;
+        let token = create_access_token(&user);
+
+        let query = format!(
+            r#"mutation {{ updateUser(input: {{ email: "{}", bio: "My bio" }}) {{
+                ... on User {{ displayName bio }}
+                ... on AuthError {{ message }}
+            }} }}"#,
+            email
+        );
+
+        let res = schema
+            .execute(Request::new(&query).data(services::authentication::Token::new(token)))
+            .await;
+        assert!(res.errors.is_empty(), "Errors: {:?}", res.errors);
+        let data = res.data.into_json().unwrap();
+        assert_eq!(data["updateUser"]["bio"], "My bio");
+
+        cleanup_test_user(&db, user.id).await;
     }
 }

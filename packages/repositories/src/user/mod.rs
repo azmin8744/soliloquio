@@ -78,6 +78,27 @@ impl UserRepository {
         }
         UserDao::update(db, model).await.map_err(|e| e.to_string())
     }
+
+    /// Update display_name/bio. `None` = leave unchanged.
+    pub async fn update_profile(
+        db: &DatabaseConnection,
+        user_id: Uuid,
+        display_name: Option<String>,
+        bio: Option<String>,
+    ) -> Result<Model, String> {
+        let mut model = ActiveModel {
+            id: ActiveValue::set(user_id),
+            updated_at: ActiveValue::set(Some(Utc::now().naive_utc())),
+            ..Default::default()
+        };
+        if let Some(dn) = display_name {
+            model.display_name = ActiveValue::set(Some(dn));
+        }
+        if let Some(b) = bio {
+            model.bio = ActiveValue::set(Some(b));
+        }
+        UserDao::update(db, model).await.map_err(|e| e.to_string())
+    }
 }
 
 #[cfg(test)]

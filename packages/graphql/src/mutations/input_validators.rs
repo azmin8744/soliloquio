@@ -79,6 +79,8 @@ impl InputValidator for ChangePasswordInput {
 #[derive(InputObject)]
 pub struct UpdateUserInput {
     pub email: String,
+    pub display_name: Option<String>,
+    pub bio: Option<String>,
 }
 
 impl InputValidator for UpdateUserInput {
