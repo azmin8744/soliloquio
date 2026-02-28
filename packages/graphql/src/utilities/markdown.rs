@@ -4,6 +4,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 /// Simple in-memory cache for rendered markdown
+#[derive(Clone)]
 pub struct MarkdownCache {
     cache: Arc<DashMap<Uuid, String>>,
 }

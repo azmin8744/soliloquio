@@ -2,6 +2,15 @@ input AddPostInput {
 	title: String!
 	content: String!
 	isPublished: Boolean
+	description: String
+	slug: String
+}
+
+type ApiKeyInfo {
+	id: UUID!
+	label: String!
+	lastUsedAt: NaiveDateTime
+	createdAt: NaiveDateTime!
 }
 
 type AuthError {
@@ -19,6 +28,12 @@ input ChangePasswordInput {
 	newPassword: String!
 }
 
+type CreateApiKeyResult {
+	id: UUID!
+	label: String!
+	rawKey: String!
+}
+
 type DbError {
 	message: String!
 }
@@ -29,6 +44,10 @@ input DeletePostInput {
 
 type DeletedPost {
 	id: UUID!
+}
+
+type EmailVerifySuccess {
+	message: String!
 }
 
 
@@ -44,6 +63,13 @@ type Mutations {
 	logout(refreshToken: String!): Boolean!
 	logoutAllDevices(accessToken: String!): Boolean!
 	changePassword(input: ChangePasswordInput!): UserMutationResult!
+	updateUser(input: UpdateUserInput!): UserMutationResult!
+	forgotPassword(email: String!): UserMutationResult!
+	resetPassword(token: String!, newPassword: String!): UserMutationResult!
+	verifyEmail(token: String!): UserMutationResult!
+	resendVerificationEmail: UserMutationResult!
+	createApiKey(label: String!): UserMutationResult!
+	revokeApiKey(id: UUID!): UserMutationResult!
 }
 
 """
@@ -81,6 +107,10 @@ type PasswordChangeSuccess {
 	message: String!
 }
 
+type PasswordResetSuccess {
+	message: String!
+}
+
 type Post {
 	id: UUID!
 	title: String!
@@ -88,6 +118,8 @@ type Post {
 	firstPublishedAt: NaiveDateTime
 	createdAt: NaiveDateTime!
 	updatedAt: NaiveDateTime!
+	description: String
+	slug: String
 	"""
 	Returns the original markdown content for editing
 	"""
@@ -140,14 +172,19 @@ type Queries {
 	Get the currently authenticated user's profile
 	"""
 	me: User
+	apiKeys: [ApiKeyInfo!]!
 	"""
 	Get paginated posts for the authenticated user
 	"""
-	posts(after: String, first: Int, sortBy: PostSortBy, sortDirection: SortDirection): PostConnection!
+	posts(after: String, first: Int, sortBy: PostSortBy, sortDirection: SortDirection, search: String): PostConnection!
 	"""
 	Get a specific post by ID for the authenticated user
 	"""
 	post(id: UUID!): Post
+}
+
+type RevokeApiKeyResult {
+	id: UUID!
 }
 
 input SignInInput {
@@ -187,16 +224,27 @@ input UpdatePostInput {
 	title: String!
 	content: String!
 	isPublished: Boolean
+	description: String
+	slug: String
+}
+
+input UpdateUserInput {
+	email: String!
+	displayName: String
+	bio: String
 }
 
 type User {
 	id: UUID!
 	email: String!
+	emailVerifiedAt: NaiveDateTime
+	displayName: String
+	bio: String
 	createdAt: NaiveDateTime
 	updatedAt: NaiveDateTime
 }
 
-union UserMutationResult = AuthorizedUser | ValidationErrorType | DbError | AuthError | PasswordChangeSuccess
+union UserMutationResult = AuthorizedUser | ValidationErrorType | DbError | AuthError | PasswordChangeSuccess | PasswordResetSuccess | EmailVerifySuccess | User | CreateApiKeyResult | RevokeApiKeyResult
 
 type ValidationErrorType {
 	message: String!
@@ -210,4 +258,3 @@ schema {
 	mutation: Mutations
 	subscription: Subscriptions
 }
-

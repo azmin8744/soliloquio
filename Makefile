@@ -19,4 +19,4 @@ migrate:
 	PGPASSWORD=$(POSTGRES_PASSWORD) psqldef -U postgres -h localhost $(DB_NAME) < schema.sql
 
 graphql_schema:
-	cd tools/schema && cargo run > ../../schema.graphql
+	cd tools/schema && cargo run
