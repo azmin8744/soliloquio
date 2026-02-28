@@ -14,16 +14,28 @@ pub struct Model {
     pub email_verified_at: Option<DateTime>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub display_name: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub bio: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::api_keys::Entity")]
+    ApiKeys,
     #[sea_orm(has_many = "super::posts::Entity")]
     Posts,
     #[sea_orm(has_many = "super::refresh_tokens::Entity")]
     RefreshTokens,
     #[sea_orm(has_many = "super::verification_tokens::Entity")]
     VerificationTokens,
+}
+
+impl Related<super::api_keys::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ApiKeys.def()
+    }
 }
 
 impl Related<super::posts::Entity> for Entity {
