@@ -1,0 +1,121 @@
+
+
+
+
+"""
+ISO 8601 combined date and time without timezone.
+
+# Examples
+
+* `2015-07-01T08:59:60.123`,
+"""
+scalar NaiveDateTime
+
+"""
+Information about pagination in a connection
+"""
+type PageInfo {
+	"""
+	When paginating backwards, are there more items?
+	"""
+	hasPreviousPage: Boolean!
+	"""
+	When paginating forwards, are there more items?
+	"""
+	hasNextPage: Boolean!
+	"""
+	When paginating backwards, the cursor to continue.
+	"""
+	startCursor: String
+	"""
+	When paginating forwards, the cursor to continue.
+	"""
+	endCursor: String
+}
+
+enum PostSortBy {
+	CREATED_AT
+	UPDATED_AT
+	TITLE
+}
+
+type PublicAuthor {
+	id: UUID!
+	displayName: String
+	bio: String
+}
+
+type PublicPost {
+	id: UUID!
+	title: String!
+	description: String
+	slug: String
+	firstPublishedAt: NaiveDateTime
+	createdAt: NaiveDateTime!
+	updatedAt: NaiveDateTime!
+	"""
+	Rendered HTML content
+	"""
+	content: String!
+	author: PublicAuthor!
+}
+
+type PublicPostConnection {
+	"""
+	Information to aid in pagination.
+	"""
+	pageInfo: PageInfo!
+	"""
+	A list of edges.
+	"""
+	edges: [PublicPostEdge!]!
+	"""
+	A list of nodes.
+	"""
+	nodes: [PublicPost!]!
+}
+
+"""
+An edge in a connection.
+"""
+type PublicPostEdge {
+	"""
+	The item at the end of the edge
+	"""
+	node: PublicPost!
+	"""
+	A cursor for use in pagination
+	"""
+	cursor: String!
+}
+
+type PublicQueryRoot {
+	posts(after: String, first: Int, sortBy: PostSortBy, sortDirection: SortDirection, search: String): PublicPostConnection!
+	post(id: UUID, slug: String): PublicPost
+	author: PublicAuthor!
+}
+
+enum SortDirection {
+	ASC
+	DESC
+}
+
+
+"""
+A UUID is a unique 128-bit number, stored as 16 octets. UUIDs are parsed as
+Strings within GraphQL. UUIDs are used to assign unique identifiers to
+entities without requiring a central allocating authority.
+
+# References
+
+* [Wikipedia: Universally Unique Identifier](http://en.wikipedia.org/wiki/Universally_unique_identifier)
+* [RFC4122: A Universally Unique IDentifier (UUID) URN Namespace](http://tools.ietf.org/html/rfc4122)
+"""
+scalar UUID
+
+directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+directive @specifiedBy(url: String!) on SCALAR
+schema {
+	query: PublicQueryRoot
+}

@@ -70,6 +70,27 @@ impl PostDao {
         Entity::delete(model).exec(db).await
     }
 
+    pub async fn find_paginated_published(
+        db: &DatabaseConnection,
+        user_id: Uuid,
+        sort_col: Column,
+        order: Order,
+        filter: Option<Condition>,
+        limit: u64,
+    ) -> Result<Vec<Model>, DbErr> {
+        let mut q = Posts::find()
+            .filter(Column::UserId.eq(user_id))
+            .filter(Column::IsPublished.eq(true));
+        if let Some(cond) = filter {
+            q = q.filter(cond);
+        }
+        q.order_by(sort_col, order.clone())
+            .order_by(Column::Id, order)
+            .limit(limit)
+            .all(db)
+            .await
+    }
+
     pub async fn search_bm25(
         db: &DatabaseConnection,
         user_id: Uuid,

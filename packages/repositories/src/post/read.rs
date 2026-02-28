@@ -68,6 +68,41 @@ impl PostRepository {
             .await
             .map_err(|e| format!("Database error: {}", e))
     }
+
+    pub async fn get_published_posts(
+        db: &DatabaseConnection,
+        user_id: Uuid,
+        after: Option<&str>,
+        first: Option<i32>,
+        sort_by: PostSortBy,
+        sort_dir: SortDirection,
+    ) -> Result<PaginatedPosts, String> {
+        let limit = (first.unwrap_or(DEFAULT_PAGE_SIZE as i32) as usize).min(MAX_PAGE_SIZE);
+        let col = sort_column(&sort_by);
+
+        let filter = if let Some(after_cursor) = after {
+            let pc = decode_cursor(after_cursor, &sort_by)?;
+            Some(build_keyset_filter(&sort_by, &sort_dir, &pc)?)
+        } else {
+            None
+        };
+
+        let order = match sort_dir {
+            SortDirection::Desc => Order::Desc,
+            SortDirection::Asc => Order::Asc,
+        };
+
+        let rows = PostDao::find_paginated_published(db, user_id, col, order, filter, (limit + 1) as u64)
+            .await
+            .map_err(|e| format!("Database error: {}", e))?;
+
+        let has_next_page = rows.len() > limit;
+        let has_previous_page = after.is_some();
+        let rows: Vec<Model> = rows.into_iter().take(limit).collect();
+        let cursors: Vec<String> = rows.iter().map(|p| encode_cursor(&sort_by, p)).collect();
+
+        Ok(PaginatedPosts { posts: rows, cursors, has_previous_page, has_next_page })
+    }
 }
 
 #[cfg(test)]

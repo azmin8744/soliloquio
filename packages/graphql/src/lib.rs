@@ -1,6 +1,7 @@
 pub mod config;
 pub mod errors;
 pub mod mutations;
+pub mod public;
 pub mod queries;
 pub mod subscriptions;
 pub mod types;

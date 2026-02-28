@@ -6,6 +6,7 @@ use tracing_actix_web::TracingLogger;
 mod setup;
 use graphql::config::SingleUserMode;
 use graphql::mutations::Mutations as MutationRoot;
+use graphql::public::{build_public_schema, PublicApiKey, PublicSchema};
 use graphql::queries::Queries as QueryRoot;
 use graphql::subscriptions::{on_connection_init, Subscriptions as SubscriptionRoot};
 use graphql::utilities::MarkdownCache;
@@ -26,7 +27,6 @@ fn get_token_from_request(req: &HttpRequest) -> Option<Token> {
     // Then check for access_token cookie
     if let Some(cookie_header) = req.headers().get("cookie") {
         if let Ok(cookie_str) = cookie_header.to_str() {
-            // Parse cookies manually to find access_token
             for cookie_pair in cookie_str.split(';') {
                 let cookie_pair = cookie_pair.trim();
                 if cookie_pair.starts_with("access_token=") {
@@ -37,6 +37,25 @@ fn get_token_from_request(req: &HttpRequest) -> Option<Token> {
         }
     }
 
+    None
+}
+
+fn get_api_key_from_request(req: &HttpRequest) -> Option<PublicApiKey> {
+    // Check X-API-Key header first
+    if let Some(v) = req.headers().get("X-API-Key") {
+        if let Ok(s) = v.to_str() {
+            return Some(PublicApiKey(s.to_string()));
+        }
+    }
+    // Fall back to Authorization: Bearer slq_...
+    if let Some(v) = req.headers().get("Authorization") {
+        if let Ok(s) = v.to_str() {
+            let stripped = s.strip_prefix("Bearer ").unwrap_or(s);
+            if stripped.starts_with("slq_") {
+                return Some(PublicApiKey(stripped.to_string()));
+            }
+        }
+    }
     None
 }
 
@@ -73,6 +92,18 @@ async fn index_ws(
         .start(&req, payload)
 }
 
+async fn public_index(
+    schema: web::Data<PublicSchema>,
+    req: HttpRequest,
+    gql_request: GraphQLRequest,
+) -> GraphQLResponse {
+    let mut request = gql_request.into_inner();
+    if let Some(key) = get_api_key_from_request(&req) {
+        request = request.data(key);
+    }
+    schema.execute(request).await.into()
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
@@ -95,6 +126,12 @@ async fn main() -> std::io::Result<()> {
         Err(err) => panic!("{}", err),
     };
 
+    let allowed_origins: Vec<String> = std::env::var("ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:8001".to_string())
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .collect();
+
     let markdown_cache = MarkdownCache::new();
     let email_service = EmailService::from_env();
     let single_user_mode = SingleUserMode(
@@ -108,28 +145,34 @@ async fn main() -> std::io::Result<()> {
         MutationRoot::default(),
         SubscriptionRoot,
     )
-    .data(db)
-    .data(markdown_cache)
+    .data(db.clone())
+    .data(markdown_cache.clone())
     .data(email_service)
     .data(single_user_mode)
     .finish();
 
+    let public_schema = build_public_schema(db, markdown_cache);
+
     tracing::info!("GraphiQL IDE: http://localhost:8000");
 
     HttpServer::new(move || {
+        let mut cors = Cors::default()
+            .allowed_methods(vec!["GET", "POST"])
+            .allowed_headers(vec!["content-type", "authorization", "x-api-key"])
+            .supports_credentials();
+        for origin in &allowed_origins {
+            cors = cors.allowed_origin(origin);
+        }
+
         App::new()
             .wrap(TracingLogger::default())
-            .wrap(
-                Cors::default()
-                    .allowed_origin("http://localhost:8001")
-                    .allowed_methods(vec!["GET", "POST"])
-                    .allowed_headers(vec!["content-type", "authorization"])
-                    .supports_credentials(),
-            )
+            .wrap(cors)
             .app_data(web::Data::new(schema.clone()))
+            .app_data(web::Data::new(public_schema.clone()))
             .service(web::resource("/").guard(guard::Get()).to(graphiql))
             .service(web::resource("/").guard(guard::Post()).to(index))
             .service(web::resource("/ws").to(index_ws))
+            .service(web::resource("/public").guard(guard::Post()).to(public_index))
     })
     .bind("127.0.0.1:8000")?
     .run()
