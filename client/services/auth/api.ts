@@ -1,7 +1,9 @@
 // GraphQL queries are just strings, no special library needed
 import { getGraphQLClient } from "../../utils/graphql_client.ts";
 import {
+  ApiKey,
   ChangePasswordInput,
+  CreateApiKeyResult,
   SignInInput,
   SignUpInput,
   UpdateUserInput,
@@ -71,11 +73,37 @@ const CHANGE_PASSWORD_MUTATION = `
 const UPDATE_USER_MUTATION = `
   mutation UpdateUser($input: UpdateUserInput!) {
     updateUser(input: $input) {
-      ... on User { id email }
+      ... on User { id email displayName bio }
       ... on ValidationErrorType { message }
       ... on AuthError { message }
       ... on DbError { message }
     }
+  }
+`;
+
+const CREATE_API_KEY_MUTATION = `
+  mutation CreateApiKey($label: String!) {
+    createApiKey(label: $label) {
+      ... on CreateApiKeyResult { id label rawKey }
+      ... on AuthError { message }
+      ... on DbError { message }
+    }
+  }
+`;
+
+const REVOKE_API_KEY_MUTATION = `
+  mutation RevokeApiKey($id: UUID!) {
+    revokeApiKey(id: $id) {
+      ... on RevokeApiKeyResult { id }
+      ... on AuthError { message }
+      ... on DbError { message }
+    }
+  }
+`;
+
+const API_KEYS_QUERY = `
+  query ApiKeys {
+    apiKeys { id label lastUsedAt createdAt }
   }
 `;
 
@@ -125,6 +153,8 @@ const ME_QUERY = `
       id
       email
       emailVerifiedAt
+      displayName
+      bio
       createdAt
       updatedAt
     }
@@ -221,4 +251,28 @@ export async function getMe(): Promise<User | null> {
   } catch (_error) {
     return null;
   }
+}
+
+export async function getApiKeys(): Promise<ApiKey[]> {
+  const client = getGraphQLClient();
+  const data = await client.request<{ apiKeys: ApiKey[] }>(API_KEYS_QUERY);
+  return data.apiKeys;
+}
+
+export async function createApiKey(label: string): Promise<UserMutationResult> {
+  const client = getGraphQLClient();
+  const data = await client.request<{ createApiKey: UserMutationResult }>(
+    CREATE_API_KEY_MUTATION,
+    { label },
+  );
+  return data.createApiKey;
+}
+
+export async function revokeApiKey(id: string): Promise<UserMutationResult> {
+  const client = getGraphQLClient();
+  const data = await client.request<{ revokeApiKey: UserMutationResult }>(
+    REVOKE_API_KEY_MUTATION,
+    { id },
+  );
+  return data.revokeApiKey;
 }

@@ -19,6 +19,7 @@ import * as $greet_name_ from "./routes/greet/[name].tsx";
 import * as $index from "./routes/index.tsx";
 import * as $posts from "./routes/posts.tsx";
 import * as $settings from "./routes/settings.tsx";
+import * as $ApiKeysSection from "./islands/ApiKeysSection.tsx";
 import * as $ChangePasswordForm from "./islands/ChangePasswordForm.tsx";
 import * as $ForgotPasswordForm from "./islands/ForgotPasswordForm.tsx";
 import * as $NavRailIsland from "./islands/NavRailIsland.tsx";
@@ -27,6 +28,7 @@ import * as $ResetPasswordForm from "./islands/ResetPasswordForm.tsx";
 import * as $SignInForm from "./islands/SignInForm.tsx";
 import * as $SignUpForm from "./islands/SignUpForm.tsx";
 import * as $UserSettingsForm from "./islands/UserSettingsForm.tsx";
+import * as $UserSettingsFormContent from "./islands/UserSettingsFormContent.tsx";
 import * as $VerifyEmailHandler from "./islands/VerifyEmailHandler.tsx";
 import * as $Workspace from "./islands/Workspace.tsx";
 import type { Manifest } from "$fresh/server.ts";
@@ -52,6 +54,7 @@ const manifest = {
     "./routes/settings.tsx": $settings,
   },
   islands: {
+    "./islands/ApiKeysSection.tsx": $ApiKeysSection,
     "./islands/ChangePasswordForm.tsx": $ChangePasswordForm,
     "./islands/ForgotPasswordForm.tsx": $ForgotPasswordForm,
     "./islands/NavRailIsland.tsx": $NavRailIsland,
@@ -60,6 +63,7 @@ const manifest = {
     "./islands/SignInForm.tsx": $SignInForm,
     "./islands/SignUpForm.tsx": $SignUpForm,
     "./islands/UserSettingsForm.tsx": $UserSettingsForm,
+    "./islands/UserSettingsFormContent.tsx": $UserSettingsFormContent,
     "./islands/VerifyEmailHandler.tsx": $VerifyEmailHandler,
     "./islands/Workspace.tsx": $Workspace,
   },

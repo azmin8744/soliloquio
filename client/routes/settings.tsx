@@ -9,7 +9,7 @@ export default function Settings() {
         <title>Settings - Soliloquio</title>
       </Head>
       <div class="flex-1 flex items-center justify-center overflow-y-auto">
-        <div class="w-full max-w-md p-8">
+        <div class="w-full max-w-lg p-8">
           <Card>
             <UserSettingsForm />
           </Card>

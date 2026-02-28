@@ -4,8 +4,23 @@ export interface User {
   id: UUID;
   email: string;
   emailVerifiedAt?: NaiveDateTime;
+  displayName?: string;
+  bio?: string;
   createdAt?: NaiveDateTime;
   updatedAt?: NaiveDateTime;
+}
+
+export interface ApiKey {
+  id: UUID;
+  label: string;
+  lastUsedAt?: NaiveDateTime;
+  createdAt: NaiveDateTime;
+}
+
+export interface CreateApiKeyResult {
+  id: UUID;
+  label: string;
+  rawKey: string;
 }
 
 export interface AuthorizedUser {

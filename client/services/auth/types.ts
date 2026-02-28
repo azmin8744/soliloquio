@@ -1,5 +1,7 @@
 import {
+  ApiKey,
   AuthorizedUser,
+  CreateApiKeyResult,
   EmailVerifySuccess,
   PasswordChangeSuccess,
   PasswordResetSuccess,
@@ -25,6 +27,8 @@ export interface ChangePasswordInput {
 
 export interface UpdateUserInput {
   email: string;
+  displayName?: string;
+  bio?: string;
 }
 
 export type UserMutationResult =
@@ -35,4 +39,8 @@ export type UserMutationResult =
   | PasswordChangeSuccess
   | PasswordResetSuccess
   | EmailVerifySuccess
-  | User;
+  | User
+  | CreateApiKeyResult
+  | { id: string };
+
+export type { ApiKey, CreateApiKeyResult };

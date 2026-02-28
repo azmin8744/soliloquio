@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   changePassword,
+  createApiKey,
   forgotPassword,
+  getApiKeys,
   getMe,
   resendVerificationEmail,
   resetPassword,
+  revokeApiKey,
   signIn,
   signUp,
   updateUser,
@@ -118,5 +121,33 @@ export function useMe() {
       return await getMe();
     },
     retry: false, // Don't retry if 401/403 or token invalid
+  });
+}
+
+export function useApiKeys() {
+  return useQuery({
+    queryKey: authKeys.apiKeys(),
+    queryFn: getApiKeys,
+    retry: false,
+  });
+}
+
+export function useCreateApiKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (label: string) => createApiKey(label),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: authKeys.apiKeys() });
+    },
+  });
+}
+
+export function useRevokeApiKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => revokeApiKey(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: authKeys.apiKeys() });
+    },
   });
 }
