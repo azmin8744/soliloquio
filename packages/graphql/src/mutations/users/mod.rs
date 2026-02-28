@@ -4,7 +4,10 @@ use crate::types::authorized_user::AuthorizedUser;
 use crate::types::user::User;
 use crate::utilities::requires_auth::RequiresAuth;
 use async_graphql::{Context, Object, Result, SimpleObject, Union};
+use uuid::Uuid;
 
+mod create_api_key;
+mod revoke_api_key;
 mod change_password;
 mod forgot_password;
 mod logout;
@@ -16,6 +19,9 @@ mod sign_in;
 mod sign_up;
 mod update_user;
 mod verify_email;
+
+pub use create_api_key::CreateApiKeyResult;
+pub use revoke_api_key::RevokeApiKeyResult;
 
 #[derive(SimpleObject)]
 pub struct PasswordChangeSuccess {
@@ -42,6 +48,8 @@ pub enum UserMutationResult {
     PasswordResetSuccess(PasswordResetSuccess),
     EmailVerifySuccess(EmailVerifySuccess),
     User(User),
+    CreateApiKey(CreateApiKeyResult),
+    RevokeApiKey(RevokeApiKeyResult),
 }
 
 pub(super) fn validation_errors_to_message(
@@ -129,5 +137,13 @@ impl UserMutation {
 
     async fn resend_verification_email(&self, ctx: &Context<'_>) -> Result<UserMutationResult> {
         resend_verification_email::resend_verification_email(self, ctx).await
+    }
+
+    async fn create_api_key(&self, ctx: &Context<'_>, label: String) -> Result<UserMutationResult> {
+        create_api_key::create_api_key(self, ctx, label).await
+    }
+
+    async fn revoke_api_key(&self, ctx: &Context<'_>, id: Uuid) -> Result<UserMutationResult> {
+        revoke_api_key::revoke_api_key(self, ctx, id).await
     }
 }
