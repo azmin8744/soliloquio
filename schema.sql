@@ -16,6 +16,8 @@ create table users (
     email text not null unique,
     password text not null,
     email_verified_at timestamp,
+    display_name text,
+    bio text,
     created_at timestamp default current_timestamp,
     updated_at timestamp default current_timestamp
 );
@@ -55,6 +57,16 @@ create unique index idx_posts_user_slug on posts (user_id, slug);
 
 create index idx_vt_token_hash on verification_tokens(token_hash);
 create index idx_vt_user_id on verification_tokens(user_id);
+
+create table api_keys (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references users(id) on delete cascade,
+    key_hash varchar(255) not null unique,
+    label text not null,
+    last_used_at timestamp,
+    created_at timestamp default current_timestamp not null
+);
+create index idx_api_keys_user on api_keys(user_id);
 
 CREATE EXTENSION IF NOT EXISTS pg_search;
 CREATE EXTENSION IF NOT EXISTS pg_ivm;
