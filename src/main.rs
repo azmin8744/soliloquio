@@ -132,6 +132,16 @@ async fn main() -> std::io::Result<()> {
         .map(|s| s.trim().to_string())
         .collect();
 
+    let public_cors_origins: Option<Vec<String>> = {
+        let raw = std::env::var("PUBLIC_CORS_ORIGINS")
+            .unwrap_or_else(|_| "*".to_string());
+        if raw.trim() == "*" {
+            None // wildcard
+        } else {
+            Some(raw.split(',').map(|s| s.trim().to_string()).collect())
+        }
+    };
+
     let markdown_cache = MarkdownCache::new();
     let email_service = EmailService::from_env();
     let single_user_mode = SingleUserMode(
@@ -156,23 +166,46 @@ async fn main() -> std::io::Result<()> {
     tracing::info!("GraphiQL IDE: http://localhost:8000");
 
     HttpServer::new(move || {
-        let mut cors = Cors::default()
+        let mut main_cors = Cors::default()
             .allowed_methods(vec!["GET", "POST"])
             .allowed_headers(vec!["content-type", "authorization", "x-api-key"])
             .supports_credentials();
         for origin in &allowed_origins {
-            cors = cors.allowed_origin(origin);
+            main_cors = main_cors.allowed_origin(origin);
         }
+
+        let public_cors = match &public_cors_origins {
+            None => Cors::default()
+                .allowed_methods(vec!["POST"])
+                .allowed_headers(vec!["content-type", "authorization", "x-api-key"])
+                .allow_any_origin(),
+            Some(origins) => {
+                let mut c = Cors::default()
+                    .allowed_methods(vec!["POST"])
+                    .allowed_headers(vec!["content-type", "authorization", "x-api-key"]);
+                for o in origins {
+                    c = c.allowed_origin(o);
+                }
+                c
+            }
+        };
 
         App::new()
             .wrap(TracingLogger::default())
-            .wrap(cors)
             .app_data(web::Data::new(schema.clone()))
             .app_data(web::Data::new(public_schema.clone()))
-            .service(web::resource("/").guard(guard::Get()).to(graphiql))
-            .service(web::resource("/").guard(guard::Post()).to(index))
-            .service(web::resource("/ws").to(index_ws))
-            .service(web::resource("/public").guard(guard::Post()).to(public_index))
+            .service(
+                web::scope("/public")
+                    .wrap(public_cors)
+                    .service(web::resource("").guard(guard::Post()).to(public_index)),
+            )
+            .service(
+                web::scope("")
+                    .wrap(main_cors)
+                    .service(web::resource("/").guard(guard::Get()).to(graphiql))
+                    .service(web::resource("/").guard(guard::Post()).to(index))
+                    .service(web::resource("/ws").to(index_ws)),
+            )
     })
     .bind("127.0.0.1:8000")?
     .run()

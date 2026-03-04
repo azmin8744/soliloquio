@@ -72,6 +72,8 @@ Required environment variables (see `.env` file):
 - `HOST_NAME`: Token issuer hostname
 - `RUST_LOG`: Log level filter (default: `info`). Use `RUST_LOG=debug` for DB queries, `RUST_LOG=sqlx=debug` for SQL only
 - `LOG_FORMAT`: `json` for structured JSON output, anything else for pretty (default: `pretty`)
+- `ALLOWED_ORIGINS`: comma-sep origins for main `/` endpoint (default: `http://localhost:8001`)
+- `PUBLIC_CORS_ORIGINS`: comma-sep origins for `/public` endpoint; default `*` (any origin, no credentials)
 
 ### Testing
 - Run `cargo test` to execute all tests
