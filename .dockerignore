@@ -1,0 +1,7 @@
+target/
+.git/
+.env
+client/
+tmp/
+.claude/
+.cocoindex_code/
