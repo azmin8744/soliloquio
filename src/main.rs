@@ -92,6 +92,10 @@ async fn index_ws(
         .start(&req, payload)
 }
 
+async fn health() -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({"status": "ok"}))
+}
+
 async fn public_index(
     schema: web::Data<PublicSchema>,
     req: HttpRequest,
@@ -204,10 +208,11 @@ async fn main() -> std::io::Result<()> {
                     .wrap(main_cors)
                     .service(web::resource("/").guard(guard::Get()).to(graphiql))
                     .service(web::resource("/").guard(guard::Post()).to(index))
-                    .service(web::resource("/ws").to(index_ws)),
+                    .service(web::resource("/ws").to(index_ws))
+                    .service(web::resource("/health").guard(guard::Get()).to(health)),
             )
     })
-    .bind("127.0.0.1:8000")?
+    .bind(std::env::var("BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:8000".to_string()))?
     .run()
     .await
 }
