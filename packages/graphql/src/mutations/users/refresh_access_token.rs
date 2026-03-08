@@ -47,7 +47,7 @@ pub(super) async fn refresh_access_token(
 
     let access_cookie = Cookie::build("access_token", &new_access_token)
         .http_only(true)
-        .secure(false)
+        .secure(std::env::var("SECURE_COOKIES").as_deref() == Ok("true"))
         .same_site(SameSite::Lax)
         .path("/")
         .max_age(actix_web::cookie::time::Duration::hours(1))

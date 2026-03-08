@@ -16,7 +16,7 @@ pub(super) async fn logout(
 
     let expired_access = Cookie::build("access_token", "")
         .http_only(true)
-        .secure(false)
+        .secure(std::env::var("SECURE_COOKIES").as_deref() == Ok("true"))
         .same_site(SameSite::Lax)
         .path("/")
         .max_age(actix_web::cookie::time::Duration::seconds(0))
@@ -24,7 +24,7 @@ pub(super) async fn logout(
 
     let expired_refresh = Cookie::build("refresh_token", "")
         .http_only(true)
-        .secure(false)
+        .secure(std::env::var("SECURE_COOKIES").as_deref() == Ok("true"))
         .same_site(SameSite::Lax)
         .path("/")
         .max_age(actix_web::cookie::time::Duration::seconds(0))

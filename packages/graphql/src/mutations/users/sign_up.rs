@@ -87,7 +87,7 @@ pub(super) async fn sign_up(
 
     let access_cookie = Cookie::build("access_token", &access_token)
         .http_only(true)
-        .secure(false)
+        .secure(std::env::var("SECURE_COOKIES").as_deref() == Ok("true"))
         .same_site(SameSite::Lax)
         .path("/")
         .max_age(actix_web::cookie::time::Duration::hours(1))
@@ -95,7 +95,7 @@ pub(super) async fn sign_up(
 
     let refresh_cookie = Cookie::build("refresh_token", &refresh_token)
         .http_only(true)
-        .secure(false)
+        .secure(std::env::var("SECURE_COOKIES").as_deref() == Ok("true"))
         .same_site(SameSite::Lax)
         .path("/")
         .max_age(actix_web::cookie::time::Duration::days(7))
