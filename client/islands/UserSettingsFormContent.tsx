@@ -39,7 +39,10 @@ export default function UserSettingsFormContent() {
       {
         onSuccess: (data) => {
           if ("email" in data) {
-            setMessage({ text: "Profile updated successfully", type: "success" });
+            setMessage({
+              text: "Profile updated successfully",
+              type: "success",
+            });
           } else if ("message" in data) {
             setMessage({
               text: (data as { message: string }).message,

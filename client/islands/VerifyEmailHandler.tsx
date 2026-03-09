@@ -27,7 +27,9 @@ function VerifyEmailHandlerContent({ token }: Props) {
           setStatus("success");
         } else {
           setStatus("error");
-          setMessage(d.message || "Verification failed. The link may have expired.");
+          setMessage(
+            d.message || "Verification failed. The link may have expired.",
+          );
         }
       },
       onError: (err) => {
@@ -47,7 +49,9 @@ function VerifyEmailHandlerContent({ token }: Props) {
         <p class="text-sm text-red-700">{message}</p>
         <p class="mt-2 text-sm">
           <a href="/settings" class="text-blue-600 hover:text-blue-500">
-            {message.includes("missing") ? "Go to settings to resend" : "Resend verification email"}
+            {message.includes("missing")
+              ? "Go to settings to resend"
+              : "Resend verification email"}
           </a>
         </p>
       </div>

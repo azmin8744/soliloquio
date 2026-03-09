@@ -40,7 +40,8 @@ export default function ApiKeysSection() {
     <div class="space-y-4">
       <h3 class="text-lg font-medium text-gray-900">API Keys</h3>
       <p class="text-sm text-gray-500">
-        API keys grant read-only access to your published posts via the public endpoint.
+        API keys grant read-only access to your published posts via the public
+        endpoint.
       </p>
 
       {newKey && (
@@ -91,13 +92,18 @@ export default function ApiKeysSection() {
               <li class="px-4 py-3 text-sm text-gray-400">No API keys yet.</li>
             )}
             {keys?.map((key) => (
-              <li key={key.id} class="flex items-center justify-between px-4 py-3">
+              <li
+                key={key.id}
+                class="flex items-center justify-between px-4 py-3"
+              >
                 <div>
                   <p class="text-sm font-medium text-gray-900">{key.label}</p>
                   <p class="text-xs text-gray-500">
                     Created {new Date(key.createdAt).toLocaleDateString()}
                     {key.lastUsedAt &&
-                      ` · Last used ${new Date(key.lastUsedAt).toLocaleDateString()}`}
+                      ` · Last used ${
+                        new Date(key.lastUsedAt).toLocaleDateString()
+                      }`}
                   </p>
                 </div>
                 <button
