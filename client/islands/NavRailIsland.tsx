@@ -5,7 +5,7 @@ import { useLogout, useMe } from "../services/auth/hooks.ts";
 import { NavRail } from "../components/NavRail.tsx";
 
 interface NavRailIslandProps {
-  activePage: "posts" | "settings";
+  activePage: "posts" | "assets" | "settings";
 }
 
 function NavRailIslandInner({ activePage }: NavRailIslandProps) {

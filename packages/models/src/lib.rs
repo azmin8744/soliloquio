@@ -3,6 +3,7 @@
 pub mod prelude;
 
 pub mod api_keys;
+pub mod assets;
 pub mod posts;
 pub mod refresh_tokens;
 pub mod sea_orm_active_enums;

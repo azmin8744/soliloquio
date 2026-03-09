@@ -4,15 +4,18 @@ use async_graphql::{http::GraphiQLSource, Schema};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 use tracing_actix_web::TracingLogger;
 mod setup;
+mod upload;
 use graphql::config::SingleUserMode;
 use graphql::mutations::Mutations as MutationRoot;
 use graphql::public::{build_public_schema, PublicApiKey, PublicSchema};
 use graphql::queries::Queries as QueryRoot;
 use graphql::subscriptions::{on_connection_init, Subscriptions as SubscriptionRoot};
 use graphql::utilities::MarkdownCache;
+use services::assets::{LocalStorageDriver, StorageDriver};
 use services::authentication::Token;
 use services::email::EmailService;
 use setup::set_up_db;
+use std::sync::Arc;
 
 type SchemaType = Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 
@@ -146,6 +149,10 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
+    let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+    let storage_driver: Arc<StorageDriver> =
+        Arc::new(StorageDriver::Local(LocalStorageDriver::new(upload_dir)));
+
     let markdown_cache = MarkdownCache::new();
     let email_service = EmailService::from_env();
     let single_user_mode = SingleUserMode(
@@ -163,9 +170,10 @@ async fn main() -> std::io::Result<()> {
     .data(markdown_cache.clone())
     .data(email_service)
     .data(single_user_mode)
+    .data(storage_driver.clone())
     .finish();
 
-    let public_schema = build_public_schema(db, markdown_cache);
+    let public_schema = build_public_schema(db.clone(), markdown_cache);
 
     tracing::info!("GraphiQL IDE: http://localhost:8000");
 
@@ -198,6 +206,9 @@ async fn main() -> std::io::Result<()> {
             .wrap(TracingLogger::default())
             .app_data(web::Data::new(schema.clone()))
             .app_data(web::Data::new(public_schema.clone()))
+            .app_data(web::Data::new(db.clone()))
+            .app_data(web::Data::new(storage_driver.clone()))
+            .app_data(actix_multipart::form::MultipartFormConfig::default().total_limit(10 * 1024 * 1024))
             .service(
                 web::scope("/public")
                     .wrap(public_cors)
@@ -209,7 +220,9 @@ async fn main() -> std::io::Result<()> {
                     .service(web::resource("/").guard(guard::Get()).to(graphiql))
                     .service(web::resource("/").guard(guard::Post()).to(index))
                     .service(web::resource("/ws").to(index_ws))
-                    .service(web::resource("/health").guard(guard::Get()).to(health)),
+                    .service(web::resource("/health").guard(guard::Get()).to(health))
+                    .service(web::resource("/upload").guard(guard::Post()).to(upload::upload))
+                    .service(web::resource("/assets/{key:.*}").guard(guard::Get()).to(upload::serve_asset)),
             )
     })
     .bind(std::env::var("BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:8000".to_string()))?

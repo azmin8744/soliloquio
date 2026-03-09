@@ -68,6 +68,16 @@ create table api_keys (
 );
 create index idx_api_keys_user on api_keys(user_id);
 
+CREATE TABLE assets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    original_filename TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    size_bytes BIGINT NOT NULL,
+    created_at TIMESTAMP DEFAULT current_timestamp NOT NULL
+);
+CREATE INDEX idx_assets_user_id ON assets(user_id, created_at DESC);
+
 CREATE EXTENSION IF NOT EXISTS pg_search;
 CREATE EXTENSION IF NOT EXISTS pg_ivm;
 CREATE EXTENSION IF NOT EXISTS vector;

@@ -9,6 +9,9 @@ import * as $api_auth_logout from "./routes/api/auth/logout.ts";
 import * as $api_auth_me from "./routes/api/auth/me.ts";
 import * as $api_auth_refresh from "./routes/api/auth/refresh.ts";
 import * as $api_graphql from "./routes/api/graphql.ts";
+import * as $api_upload from "./routes/api/upload.ts";
+import * as $assets_path_ from "./routes/assets/[...path].ts";
+import * as $assets_index from "./routes/assets/index.tsx";
 import * as $auth_change_password from "./routes/auth/change_password.tsx";
 import * as $auth_forgot_password from "./routes/auth/forgot_password.tsx";
 import * as $auth_reset_password from "./routes/auth/reset_password.tsx";
@@ -20,6 +23,7 @@ import * as $index from "./routes/index.tsx";
 import * as $posts from "./routes/posts.tsx";
 import * as $settings from "./routes/settings.tsx";
 import * as $ApiKeysSection from "./islands/ApiKeysSection.tsx";
+import * as $AssetsLibrary from "./islands/AssetsLibrary.tsx";
 import * as $ChangePasswordForm from "./islands/ChangePasswordForm.tsx";
 import * as $ForgotPasswordForm from "./islands/ForgotPasswordForm.tsx";
 import * as $NavRailIsland from "./islands/NavRailIsland.tsx";
@@ -42,6 +46,9 @@ const manifest = {
     "./routes/api/auth/me.ts": $api_auth_me,
     "./routes/api/auth/refresh.ts": $api_auth_refresh,
     "./routes/api/graphql.ts": $api_graphql,
+    "./routes/api/upload.ts": $api_upload,
+    "./routes/assets/[...path].ts": $assets_path_,
+    "./routes/assets/index.tsx": $assets_index,
     "./routes/auth/change_password.tsx": $auth_change_password,
     "./routes/auth/forgot_password.tsx": $auth_forgot_password,
     "./routes/auth/reset_password.tsx": $auth_reset_password,
@@ -55,6 +62,7 @@ const manifest = {
   },
   islands: {
     "./islands/ApiKeysSection.tsx": $ApiKeysSection,
+    "./islands/AssetsLibrary.tsx": $AssetsLibrary,
     "./islands/ChangePasswordForm.tsx": $ChangePasswordForm,
     "./islands/ForgotPasswordForm.tsx": $ForgotPasswordForm,
     "./islands/NavRailIsland.tsx": $NavRailIsland,

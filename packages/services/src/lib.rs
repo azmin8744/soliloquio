@@ -1,4 +1,5 @@
 pub mod api_keys;
+pub mod assets;
 pub mod authentication;
 pub mod validation;
 pub mod email;
