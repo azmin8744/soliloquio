@@ -13,20 +13,23 @@ import {
   activePostId,
   editorBuffer,
   isDirty,
+  isMetaPaneOpen,
   isPreviewToggled,
   lastSavedBuffer,
   loadPostIntoBuffer,
   markBufferClean,
+  metaPaneTab,
   postsSignal,
   searchSignal,
   setSearch,
   setSort,
   sortSignal,
 } from "../utils/workspace_signals.ts";
-import type { EditorBuffer } from "../utils/workspace_signals.ts";
+import type { EditorBuffer, MetaPaneTab } from "../utils/workspace_signals.ts";
 import { useAutoSave } from "../utils/use_auto_save.ts";
 import { PostTabs } from "../components/PostTabs.tsx";
 import { EditorPane } from "../components/EditorPane.tsx";
+import { MetadataPane } from "../components/MetadataPane.tsx";
 import { EmailVerificationBanner } from "../components/EmailVerificationBanner.tsx";
 
 const RECOVERY_KEY = "soliloquio_editor_recovery";
@@ -181,6 +184,16 @@ function WorkspaceInner() {
     editorBuffer.value = { ...editorBuffer.value, ...partial };
   }, []);
 
+  // Meta pane toggle
+  const handleToggleMetaTab = useCallback((tab: MetaPaneTab) => {
+    if (isMetaPaneOpen.value && metaPaneTab.value === tab) {
+      isMetaPaneOpen.value = false;
+    } else {
+      metaPaneTab.value = tab;
+      isMetaPaneOpen.value = true;
+    }
+  }, []);
+
   if (authLoading) {
     return (
       <div class="flex-1 flex items-center justify-center text-gray-400">
@@ -228,7 +241,17 @@ function WorkspaceInner() {
           isDirty={isDirty.value}
           onDelete={handleDelete}
           isDeleting={deletePost.isPending}
+          isMetaPaneOpen={isMetaPaneOpen.value}
+          activeMetaTab={metaPaneTab.value}
+          onToggleMetaTab={handleToggleMetaTab}
         />
+        {isMetaPaneOpen.value && (
+          <MetadataPane
+            activeTab={metaPaneTab.value}
+            buffer={editorBuffer.value}
+            onBufferChange={handleBufferChange}
+          />
+        )}
       </div>
 
       {/* Recovery toast */}
