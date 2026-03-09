@@ -60,6 +60,11 @@ export const lastSavedBuffer = signal<EditorBuffer>({
   slug: "",
 });
 
+export type MetaPaneTab = "meta" | "images";
+export const isMetaPaneOpen = signal(false);
+export const metaPaneTab = signal<MetaPaneTab>("meta");
+export const pendingInsertText = signal<string | null>(null);
+
 export const activePost = computed(() => {
   const id = activePostId.value;
   if (!id) return null;
