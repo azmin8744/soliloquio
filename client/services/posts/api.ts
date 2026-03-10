@@ -91,6 +91,7 @@ const GET_POSTS_QUERY = `
         markdownContent
         content
         slug
+        description
       }
     }
   }
@@ -107,6 +108,7 @@ const GET_POST_QUERY = `
       createdAt
       updatedAt
       slug
+      description
     }
   }
 `;
