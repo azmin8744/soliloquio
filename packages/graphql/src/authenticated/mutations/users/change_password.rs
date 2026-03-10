@@ -1,6 +1,6 @@
 use super::validation_errors_to_message;
 use crate::errors::{AuthError, DbError, ValidationErrorType};
-use crate::mutations::input_validators::ChangePasswordInput;
+use crate::authenticated::mutations::input_validators::ChangePasswordInput;
 use crate::utilities::requires_auth::RequiresAuth;
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},

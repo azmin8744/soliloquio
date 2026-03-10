@@ -5,8 +5,8 @@ use sea_orm::*;
 use uuid::Uuid;
 
 use crate::config::SingleUserMode;
-use crate::mutations::Mutations;
-use crate::queries::Queries;
+use crate::authenticated::mutations::Mutations;
+use crate::authenticated::queries::Queries;
 use crate::utilities::MarkdownCache;
 
 const DATABASE_URL: &str = "postgres://postgres:password@localhost:5432/soliloquio";

@@ -1,7 +1,7 @@
 use super::validation_errors_to_message;
 use crate::config::SingleUserMode;
 use crate::errors::{AuthError, DbError, ValidationErrorType};
-use crate::mutations::input_validators::SignUpInput;
+use crate::authenticated::mutations::input_validators::SignUpInput;
 use crate::types::authorized_user::AuthorizedUser;
 use crate::utilities::cookies::set_auth_cookies;
 use argon2::{

@@ -1,6 +1,6 @@
 use super::validation_errors_to_message;
 use crate::errors::{AuthError, DbError, ValidationErrorType};
-use crate::mutations::input_validators::UpdateUserInput;
+use crate::authenticated::mutations::input_validators::UpdateUserInput;
 use crate::types::user::User;
 use crate::utilities::requires_auth::RequiresAuth;
 use async_graphql::{Context, Object, Result, Union};
