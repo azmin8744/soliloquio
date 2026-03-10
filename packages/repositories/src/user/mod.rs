@@ -80,6 +80,18 @@ impl UserRepository {
     }
 
     /// Update display_name/bio. `None` = leave unchanged.
+    pub async fn verify_email(
+        db: &DatabaseConnection,
+        user_id: Uuid,
+    ) -> Result<Model, String> {
+        let model = ActiveModel {
+            id: ActiveValue::set(user_id),
+            email_verified_at: ActiveValue::set(Some(Utc::now().naive_utc())),
+            ..Default::default()
+        };
+        UserDao::update(db, model).await.map_err(|e| e.to_string())
+    }
+
     pub async fn update_profile(
         db: &DatabaseConnection,
         user_id: Uuid,
@@ -210,6 +222,18 @@ mod tests {
         .unwrap();
 
         assert!(found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_verify_email_sets_email_verified_at() {
+        let db = setup_test_db().await;
+        let (user, email) = create_test_user(&db, "verify_email").await;
+
+        let updated = UserRepository::verify_email(&db, user.id).await.unwrap();
+
+        assert!(updated.email_verified_at.is_some());
+
+        cleanup_user_by_email(&db, &email).await;
     }
 
     #[tokio::test]

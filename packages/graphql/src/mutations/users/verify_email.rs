@@ -1,8 +1,8 @@
 use super::{EmailVerifySuccess, UserMutationResult};
 use crate::errors::{AuthError, DbError};
 use async_graphql::{Context, Result};
-use models::{prelude::*, *};
-use sea_orm::*;
+use repositories::UserRepository;
+use sea_orm::DatabaseConnection;
 use services::verification_token::{cleanup_expired, validate_token, TokenKind};
 
 pub(super) async fn verify_email(
@@ -16,13 +16,8 @@ pub(super) async fn verify_email(
         Err(e) => return Ok(UserMutationResult::AuthError(AuthError { message: e.message })),
     };
 
-    let mut user_active = users::ActiveModel {
-        id: ActiveValue::set(record.user_id),
-        ..Default::default()
-    };
-    user_active.email_verified_at = ActiveValue::set(Some(chrono::Utc::now().naive_utc()));
-    if let Err(e) = Users::update(user_active).exec(db).await {
-        return Ok(UserMutationResult::DbError(DbError { message: e.to_string() }));
+    if let Err(e) = UserRepository::verify_email(db, record.user_id).await {
+        return Ok(UserMutationResult::DbError(DbError { message: e }));
     }
 
     let _ = cleanup_expired(db).await;
