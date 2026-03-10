@@ -1,3 +1,4 @@
+pub mod cookies;
 pub mod markdown;
 pub mod requires_auth;
 

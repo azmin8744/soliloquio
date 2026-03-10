@@ -1,5 +1,5 @@
+use crate::utilities::cookies::clear_auth_cookies;
 use crate::errors::AuthError;
-use actix_web::cookie::{Cookie, SameSite};
 use async_graphql::{Context, Result};
 use sea_orm::DatabaseConnection;
 use services::authentication::refresh_token::{cleanup_expired_tokens, revoke_refresh_token};
@@ -14,24 +14,7 @@ pub(super) async fn logout(
         .await
         .map_err(|e| AuthError { message: e.message })?;
 
-    let expired_access = Cookie::build("access_token", "")
-        .http_only(true)
-        .secure(std::env::var("SECURE_COOKIES").as_deref() == Ok("true"))
-        .same_site(SameSite::Lax)
-        .path("/")
-        .max_age(actix_web::cookie::time::Duration::seconds(0))
-        .finish();
-
-    let expired_refresh = Cookie::build("refresh_token", "")
-        .http_only(true)
-        .secure(std::env::var("SECURE_COOKIES").as_deref() == Ok("true"))
-        .same_site(SameSite::Lax)
-        .path("/")
-        .max_age(actix_web::cookie::time::Duration::seconds(0))
-        .finish();
-
-    ctx.insert_http_header("Set-Cookie", expired_access.to_string());
-    ctx.append_http_header("Set-Cookie", expired_refresh.to_string());
+    clear_auth_cookies(ctx);
 
     tracing::info!("logout");
 

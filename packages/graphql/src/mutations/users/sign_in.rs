@@ -2,7 +2,7 @@ use super::{UserMutationResult, validation_errors_to_message};
 use crate::errors::{AuthError, DbError, ValidationErrorType};
 use crate::mutations::input_validators::SignInInput;
 use crate::types::authorized_user::AuthorizedUser;
-use actix_web::cookie::{Cookie, SameSite};
+use crate::utilities::cookies::set_auth_cookies;
 use argon2::{
     password_hash::{PasswordHash, PasswordVerifier},
     Argon2,
@@ -69,24 +69,7 @@ pub(super) async fn sign_in(
 
     let access_token = generate_token(&user);
 
-    let access_cookie = Cookie::build("access_token", &access_token)
-        .http_only(true)
-        .secure(std::env::var("SECURE_COOKIES").as_deref() == Ok("true"))
-        .same_site(SameSite::Lax)
-        .path("/")
-        .max_age(actix_web::cookie::time::Duration::hours(1))
-        .finish();
-
-    let refresh_cookie = Cookie::build("refresh_token", &refresh_token)
-        .http_only(true)
-        .secure(std::env::var("SECURE_COOKIES").as_deref() == Ok("true"))
-        .same_site(SameSite::Lax)
-        .path("/")
-        .max_age(actix_web::cookie::time::Duration::days(7))
-        .finish();
-
-    ctx.insert_http_header("Set-Cookie", access_cookie.to_string());
-    ctx.append_http_header("Set-Cookie", refresh_cookie.to_string());
+    set_auth_cookies(ctx, &access_token, &refresh_token);
 
     tracing::info!(user_id = %user.id, "signin success");
     Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {

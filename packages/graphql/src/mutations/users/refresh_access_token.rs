@@ -1,7 +1,7 @@
 use super::UserMutationResult;
+use crate::utilities::cookies::set_access_cookie;
 use crate::errors::AuthError;
 use crate::types::authorized_user::AuthorizedUser;
-use actix_web::cookie::{Cookie, SameSite};
 use async_graphql::{Context, Result};
 use sea_orm::DatabaseConnection;
 use services::authentication::refresh_token::{cleanup_expired_tokens, validate_refresh_token};
@@ -45,15 +45,7 @@ pub(super) async fn refresh_access_token(
 
     let new_access_token = generate_token(&user);
 
-    let access_cookie = Cookie::build("access_token", &new_access_token)
-        .http_only(true)
-        .secure(std::env::var("SECURE_COOKIES").as_deref() == Ok("true"))
-        .same_site(SameSite::Lax)
-        .path("/")
-        .max_age(actix_web::cookie::time::Duration::hours(1))
-        .finish();
-
-    ctx.insert_http_header("Set-Cookie", access_cookie.to_string());
+    set_access_cookie(ctx, &new_access_token);
 
     let _ = cleanup_expired_tokens(db).await;
 
