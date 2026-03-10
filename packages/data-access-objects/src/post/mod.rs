@@ -1,7 +1,15 @@
+use crate::ownership::{verify_ownership, OwnedEntity};
 use models::posts::{ActiveModel, Column, Entity, Model};
 use models::prelude::Posts;
 use sea_orm::entity::prelude::Uuid;
 use sea_orm::*;
+
+impl OwnedEntity for Entity {
+    type UserIdColumn = Column;
+    fn user_id_column() -> Self::UserIdColumn {
+        Column::UserId
+    }
+}
 
 pub struct PostDao;
 
@@ -18,10 +26,7 @@ impl PostDao {
         id: Uuid,
         user_id: Uuid,
     ) -> Result<Option<Model>, DbErr> {
-        Posts::find_by_id(id)
-            .filter(Column::UserId.eq(user_id))
-            .one(db)
-            .await
+        verify_ownership::<Entity>(db, id, user_id).await
     }
 
     pub async fn find_paginated(

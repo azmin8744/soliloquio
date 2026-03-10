@@ -1,3 +1,4 @@
+use data_access_objects::verify_ownership;
 use models::assets::{self, ActiveModel, Column, Entity, Model};
 use sea_orm::entity::prelude::Uuid;
 use sea_orm::*;
@@ -66,9 +67,7 @@ impl AssetRepository {
         user_id: Uuid,
         id: Uuid,
     ) -> Result<Option<Model>, String> {
-        Entity::find_by_id(id)
-            .filter(Column::UserId.eq(user_id))
-            .one(db)
+        verify_ownership::<Entity>(db, id, user_id)
             .await
             .map_err(|e| format!("Database error: {e}"))
     }
