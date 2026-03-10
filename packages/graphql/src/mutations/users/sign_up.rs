@@ -1,4 +1,4 @@
-use super::{UserMutationResult, validation_errors_to_message};
+use super::validation_errors_to_message;
 use crate::config::SingleUserMode;
 use crate::errors::{AuthError, DbError, ValidationErrorType};
 use crate::mutations::input_validators::SignUpInput;
@@ -8,7 +8,7 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2,
 };
-use async_graphql::{Context, Result};
+use async_graphql::{Context, Object, Result, Union};
 use repositories::UserRepository;
 use sea_orm::entity::prelude::Uuid;
 use sea_orm::*;
@@ -18,80 +18,91 @@ use services::email::EmailService;
 use services::validation::input_validator::InputValidator;
 use services::verification_token::{create_token, TokenKind};
 
-pub(super) async fn sign_up(
-    ctx: &Context<'_>,
-    input: SignUpInput,
-) -> Result<UserMutationResult> {
-    let db = ctx.data::<DatabaseConnection>().unwrap();
+#[derive(Union)]
+pub enum SignUpResult {
+    AuthorizedUser(AuthorizedUser),
+    ValidationError(ValidationErrorType),
+    AuthError(AuthError),
+    DbError(DbError),
+}
 
-    if let Err(validation_errors) = input.validate() {
-        return Ok(UserMutationResult::ValidationError(ValidationErrorType {
-            message: validation_errors_to_message(validation_errors),
-        }));
-    }
+#[derive(Default)]
+pub struct SignUpMutation;
 
-    let single_user_mode = ctx.data::<SingleUserMode>().map(|s| s.0).unwrap_or(false);
-    if single_user_mode {
-        let count = UserRepository::count(db).await.unwrap_or(0);
-        if count >= 1 {
-            return Ok(UserMutationResult::AuthError(AuthError {
-                message: "Registration is disabled".to_string(),
+#[Object]
+impl SignUpMutation {
+    async fn sign_up(&self, ctx: &Context<'_>, input: SignUpInput) -> Result<SignUpResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        if let Err(validation_errors) = input.validate() {
+            return Ok(SignUpResult::ValidationError(ValidationErrorType {
+                message: validation_errors_to_message(validation_errors),
             }));
         }
-    }
 
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-    let password_hash = match argon2.hash_password(&input.password.into_bytes(), &salt) {
-        Ok(hash) => hash.to_string(),
-        Err(_) => {
-            return Ok(UserMutationResult::AuthError(AuthError {
-                message: "Failed to hash password".to_string(),
-            }))
-        }
-    };
-
-    let res = match UserRepository::create(db, Uuid::new_v4(), input.email, password_hash).await {
-        Ok(user) => user,
-        Err(e) => {
-            tracing::warn!("signup DB error");
-            return Ok(UserMutationResult::DbError(DbError {
-                message: e.to_string(),
-            }));
-        }
-    };
-
-    let refresh_token = match create_refresh_token(db, res.id, None).await {
-        Ok(token) => token,
-        Err(e) => {
-            return Ok(UserMutationResult::AuthError(AuthError {
-                message: e.to_string(),
-            }))
-        }
-    };
-
-    let _ = cleanup_expired_tokens(db).await;
-
-    if let Ok(email_service) = ctx.data::<EmailService>() {
-        match create_token(db, res.id, TokenKind::EmailVerification, 86400).await {
-            Ok(raw_token) => {
-                if let Err(e) = email_service.send_email_verification(&res.email, &raw_token).await {
-                    tracing::warn!(user_id = %res.id, error = %e, "failed to send verification email");
-                }
+        let single_user_mode = ctx.data::<SingleUserMode>().map(|s| s.0).unwrap_or(false);
+        if single_user_mode {
+            let count = UserRepository::count(db).await.unwrap_or(0);
+            if count >= 1 {
+                return Ok(SignUpResult::AuthError(AuthError {
+                    message: "Registration is disabled".to_string(),
+                }));
             }
-            Err(e) => tracing::warn!(user_id = %res.id, error = %e.message, "failed to create verification token"),
         }
+
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        let password_hash = match argon2.hash_password(&input.password.into_bytes(), &salt) {
+            Ok(hash) => hash.to_string(),
+            Err(_) => {
+                return Ok(SignUpResult::AuthError(AuthError {
+                    message: "Failed to hash password".to_string(),
+                }))
+            }
+        };
+
+        let res = match UserRepository::create(db, Uuid::new_v4(), input.email, password_hash).await {
+            Ok(user) => user,
+            Err(e) => {
+                tracing::warn!("signup DB error");
+                return Ok(SignUpResult::DbError(DbError {
+                    message: e.to_string(),
+                }));
+            }
+        };
+
+        let refresh_token = match create_refresh_token(db, res.id, None).await {
+            Ok(token) => token,
+            Err(e) => {
+                return Ok(SignUpResult::AuthError(AuthError {
+                    message: e.to_string(),
+                }))
+            }
+        };
+
+        let _ = cleanup_expired_tokens(db).await;
+
+        if let Ok(email_service) = ctx.data::<EmailService>() {
+            match create_token(db, res.id, TokenKind::EmailVerification, 86400).await {
+                Ok(raw_token) => {
+                    if let Err(e) = email_service.send_email_verification(&res.email, &raw_token).await {
+                        tracing::warn!(user_id = %res.id, error = %e, "failed to send verification email");
+                    }
+                }
+                Err(e) => tracing::warn!(user_id = %res.id, error = %e.message, "failed to create verification token"),
+            }
+        }
+
+        let access_token = generate_token(&res);
+
+        set_auth_cookies(ctx, &access_token, &refresh_token);
+
+        tracing::info!(user_id = %res.id, "signup success");
+        Ok(SignUpResult::AuthorizedUser(AuthorizedUser {
+            token: access_token,
+            refresh_token,
+        }))
     }
-
-    let access_token = generate_token(&res);
-
-    set_auth_cookies(ctx, &access_token, &refresh_token);
-
-    tracing::info!(user_id = %res.id, "signup success");
-    Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
-        token: access_token,
-        refresh_token,
-    }))
 }
 
 #[cfg(test)]

@@ -1,58 +1,70 @@
-use super::UserMutationResult;
-use crate::utilities::cookies::set_access_cookie;
 use crate::errors::AuthError;
 use crate::types::authorized_user::AuthorizedUser;
-use async_graphql::{Context, Result};
+use crate::utilities::cookies::set_access_cookie;
+use async_graphql::{Context, Object, Result, Union};
 use sea_orm::DatabaseConnection;
 use services::authentication::refresh_token::{cleanup_expired_tokens, validate_refresh_token};
 use services::authentication::token::{generate_token, Token};
 
-pub(super) async fn refresh_access_token(
-    ctx: &Context<'_>,
-    refresh_token: String,
-) -> Result<UserMutationResult> {
-    let db = ctx.data::<DatabaseConnection>().unwrap();
+#[derive(Union)]
+pub enum RefreshAccessTokenResult {
+    AuthorizedUser(AuthorizedUser),
+    AuthError(AuthError),
+}
 
-    let refresh_token_record = match validate_refresh_token(db, &refresh_token).await {
-        Ok(record) => record,
-        Err(e) => {
-            return Ok(UserMutationResult::AuthError(AuthError {
-                message: e.message,
-            }))
+#[derive(Default)]
+pub struct RefreshAccessTokenMutation;
+
+#[Object]
+impl RefreshAccessTokenMutation {
+    async fn refresh_access_token(
+        &self,
+        ctx: &Context<'_>,
+        refresh_token: String,
+    ) -> Result<RefreshAccessTokenResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        let refresh_token_record = match validate_refresh_token(db, &refresh_token).await {
+            Ok(record) => record,
+            Err(e) => {
+                return Ok(RefreshAccessTokenResult::AuthError(AuthError {
+                    message: e.message,
+                }))
+            }
+        };
+
+        let user = match services::authentication::authenticator::get_user(
+            db,
+            &Token::new(refresh_token.clone()),
+        )
+        .await
+        {
+            Ok(user) => user,
+            Err(e) => {
+                return Ok(RefreshAccessTokenResult::AuthError(AuthError {
+                    message: e.to_string(),
+                }))
+            }
+        };
+
+        if refresh_token_record.user_id != user.id {
+            tracing::warn!("refresh token user_id mismatch");
+            return Ok(RefreshAccessTokenResult::AuthError(AuthError {
+                message: "Refresh token does not belong to the authenticated user".to_string(),
+            }));
         }
-    };
 
-    let user = match services::authentication::authenticator::get_user(
-        db,
-        &Token::new(refresh_token.clone()),
-    )
-    .await
-    {
-        Ok(user) => user,
-        Err(e) => {
-            return Ok(UserMutationResult::AuthError(AuthError {
-                message: e.to_string(),
-            }))
-        }
-    };
+        let new_access_token = generate_token(&user);
 
-    if refresh_token_record.user_id != user.id {
-        tracing::warn!("refresh token user_id mismatch");
-        return Ok(UserMutationResult::AuthError(AuthError {
-            message: "Refresh token does not belong to the authenticated user".to_string(),
-        }));
+        set_access_cookie(ctx, &new_access_token);
+
+        let _ = cleanup_expired_tokens(db).await;
+
+        Ok(RefreshAccessTokenResult::AuthorizedUser(AuthorizedUser {
+            token: new_access_token,
+            refresh_token,
+        }))
     }
-
-    let new_access_token = generate_token(&user);
-
-    set_access_cookie(ctx, &new_access_token);
-
-    let _ = cleanup_expired_tokens(db).await;
-
-    Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
-        token: new_access_token,
-        refresh_token,
-    }))
 }
 
 #[cfg(test)]

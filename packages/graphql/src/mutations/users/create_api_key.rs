@@ -1,7 +1,6 @@
-use super::{UserMutation, UserMutationResult};
 use crate::errors::{AuthError, DbError};
 use crate::utilities::requires_auth::RequiresAuth;
-use async_graphql::{Context, Result, SimpleObject};
+use async_graphql::{Context, Object, Result, SimpleObject, Union};
 use sea_orm::DatabaseConnection;
 use services::api_keys;
 use uuid::Uuid;
@@ -13,24 +12,45 @@ pub struct CreateApiKeyResult {
     pub raw_key: String,
 }
 
-pub(super) async fn create_api_key(
-    mutation: &UserMutation,
-    ctx: &Context<'_>,
-    label: String,
-) -> Result<UserMutationResult> {
-    let user = match mutation.require_authenticate_as_user(ctx).await {
-        Ok(u) => u,
-        Err(e) => return Ok(UserMutationResult::AuthError(AuthError { message: e.to_string() })),
-    };
-    let db = ctx.data::<DatabaseConnection>().unwrap();
-    let (raw_key, key_hash) = api_keys::generate();
-    match api_keys::create(db, user.id, label.clone(), key_hash).await {
-        Ok(record) => Ok(UserMutationResult::CreateApiKey(CreateApiKeyResult {
-            id: record.id,
-            label: record.label,
-            raw_key,
-        })),
-        Err(e) => Ok(UserMutationResult::DbError(DbError { message: e.to_string() })),
+#[derive(Union)]
+pub enum CreateApiKeyMutationResult {
+    CreateApiKey(CreateApiKeyResult),
+    AuthError(AuthError),
+    DbError(DbError),
+}
+
+#[derive(Default)]
+pub struct CreateApiKeyMutation;
+
+impl RequiresAuth for CreateApiKeyMutation {}
+
+#[Object]
+impl CreateApiKeyMutation {
+    async fn create_api_key(
+        &self,
+        ctx: &Context<'_>,
+        label: String,
+    ) -> Result<CreateApiKeyMutationResult> {
+        let user = match self.require_authenticate_as_user(ctx).await {
+            Ok(u) => u,
+            Err(e) => {
+                return Ok(CreateApiKeyMutationResult::AuthError(AuthError {
+                    message: e.to_string(),
+                }))
+            }
+        };
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+        let (raw_key, key_hash) = api_keys::generate();
+        match api_keys::create(db, user.id, label.clone(), key_hash).await {
+            Ok(record) => Ok(CreateApiKeyMutationResult::CreateApiKey(CreateApiKeyResult {
+                id: record.id,
+                label: record.label,
+                raw_key,
+            })),
+            Err(e) => Ok(CreateApiKeyMutationResult::DbError(DbError {
+                message: e.to_string(),
+            })),
+        }
     }
 }
 

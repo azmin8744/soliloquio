@@ -1,7 +1,6 @@
-use super::{UserMutation, UserMutationResult};
 use crate::errors::{AuthError, DbError};
 use crate::utilities::requires_auth::RequiresAuth;
-use async_graphql::{Context, Result, SimpleObject};
+use async_graphql::{Context, Object, Result, SimpleObject, Union};
 use sea_orm::DatabaseConnection;
 use services::api_keys;
 use uuid::Uuid;
@@ -11,19 +10,40 @@ pub struct RevokeApiKeyResult {
     pub id: Uuid,
 }
 
-pub(super) async fn revoke_api_key(
-    mutation: &UserMutation,
-    ctx: &Context<'_>,
-    id: Uuid,
-) -> Result<UserMutationResult> {
-    let user = match mutation.require_authenticate_as_user(ctx).await {
-        Ok(u) => u,
-        Err(e) => return Ok(UserMutationResult::AuthError(AuthError { message: e.to_string() })),
-    };
-    let db = ctx.data::<DatabaseConnection>().unwrap();
-    match api_keys::revoke(db, id, user.id).await {
-        Ok(_) => Ok(UserMutationResult::RevokeApiKey(RevokeApiKeyResult { id })),
-        Err(e) => Ok(UserMutationResult::DbError(DbError { message: e.to_string() })),
+#[derive(Union)]
+pub enum RevokeApiKeyMutationResult {
+    RevokeApiKey(RevokeApiKeyResult),
+    AuthError(AuthError),
+    DbError(DbError),
+}
+
+#[derive(Default)]
+pub struct RevokeApiKeyMutation;
+
+impl RequiresAuth for RevokeApiKeyMutation {}
+
+#[Object]
+impl RevokeApiKeyMutation {
+    async fn revoke_api_key(
+        &self,
+        ctx: &Context<'_>,
+        id: Uuid,
+    ) -> Result<RevokeApiKeyMutationResult> {
+        let user = match self.require_authenticate_as_user(ctx).await {
+            Ok(u) => u,
+            Err(e) => {
+                return Ok(RevokeApiKeyMutationResult::AuthError(AuthError {
+                    message: e.to_string(),
+                }))
+            }
+        };
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+        match api_keys::revoke(db, id, user.id).await {
+            Ok(_) => Ok(RevokeApiKeyMutationResult::RevokeApiKey(RevokeApiKeyResult { id })),
+            Err(e) => Ok(RevokeApiKeyMutationResult::DbError(DbError {
+                message: e.to_string(),
+            })),
+        }
     }
 }
 

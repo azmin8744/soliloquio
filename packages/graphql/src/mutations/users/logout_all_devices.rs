@@ -1,25 +1,32 @@
 use crate::errors::AuthError;
-use async_graphql::{Context, Result};
+use async_graphql::{Context, Object, Result};
 use sea_orm::DatabaseConnection;
 use services::authentication::refresh_token::{cleanup_expired_tokens, revoke_all_refresh_tokens};
 use services::authentication::token::Token;
 
-pub(super) async fn logout_all_devices(
-    ctx: &Context<'_>,
-    access_token: String,
-) -> Result<bool, AuthError> {
-    let db = ctx.data::<DatabaseConnection>().unwrap();
+#[derive(Default)]
+pub struct LogoutAllDevicesMutation;
 
-    let token = Token::new(access_token);
-    let user = services::authentication::authenticator::get_user(db, &token).await?;
+#[Object]
+impl LogoutAllDevicesMutation {
+    async fn logout_all_devices(
+        &self,
+        ctx: &Context<'_>,
+        access_token: String,
+    ) -> Result<bool, AuthError> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
 
-    revoke_all_refresh_tokens(db, user.id)
-        .await
-        .map_err(|e| AuthError { message: e.message })?;
+        let token = Token::new(access_token);
+        let user = services::authentication::authenticator::get_user(db, &token).await?;
 
-    let _ = cleanup_expired_tokens(db).await;
+        revoke_all_refresh_tokens(db, user.id)
+            .await
+            .map_err(|e| AuthError { message: e.message })?;
 
-    Ok(true)
+        let _ = cleanup_expired_tokens(db).await;
+
+        Ok(true)
+    }
 }
 
 #[cfg(test)]

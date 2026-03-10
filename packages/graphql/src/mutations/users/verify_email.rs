@@ -1,29 +1,43 @@
-use super::{EmailVerifySuccess, UserMutationResult};
 use crate::errors::{AuthError, DbError};
-use async_graphql::{Context, Result};
+use async_graphql::{Context, Object, Result, SimpleObject, Union};
 use repositories::UserRepository;
 use sea_orm::DatabaseConnection;
 use services::verification_token::{cleanup_expired, validate_token, TokenKind};
 
-pub(super) async fn verify_email(
-    ctx: &Context<'_>,
-    token: String,
-) -> Result<UserMutationResult> {
-    let db = ctx.data::<DatabaseConnection>().unwrap();
+#[derive(SimpleObject)]
+pub struct EmailVerifySuccess {
+    pub message: String,
+}
 
-    let record = match validate_token(db, &token, TokenKind::EmailVerification).await {
-        Ok(r) => r,
-        Err(e) => return Ok(UserMutationResult::AuthError(AuthError { message: e.message })),
-    };
+#[derive(Union)]
+pub enum VerifyEmailResult {
+    EmailVerifySuccess(EmailVerifySuccess),
+    AuthError(AuthError),
+    DbError(DbError),
+}
 
-    if let Err(e) = UserRepository::verify_email(db, record.user_id).await {
-        return Ok(UserMutationResult::DbError(DbError { message: e }));
+#[derive(Default)]
+pub struct VerifyEmailMutation;
+
+#[Object]
+impl VerifyEmailMutation {
+    async fn verify_email(&self, ctx: &Context<'_>, token: String) -> Result<VerifyEmailResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        let record = match validate_token(db, &token, TokenKind::EmailVerification).await {
+            Ok(r) => r,
+            Err(e) => return Ok(VerifyEmailResult::AuthError(AuthError { message: e.message })),
+        };
+
+        if let Err(e) = UserRepository::verify_email(db, record.user_id).await {
+            return Ok(VerifyEmailResult::DbError(DbError { message: e }));
+        }
+
+        let _ = cleanup_expired(db).await;
+
+        tracing::info!(user_id = %record.user_id, "email verified");
+        Ok(VerifyEmailResult::EmailVerifySuccess(EmailVerifySuccess {
+            message: "Email verified successfully".to_string(),
+        }))
     }
-
-    let _ = cleanup_expired(db).await;
-
-    tracing::info!(user_id = %record.user_id, "email verified");
-    Ok(UserMutationResult::EmailVerifySuccess(EmailVerifySuccess {
-        message: "Email verified successfully".to_string(),
-    }))
 }

@@ -1,4 +1,4 @@
-use super::{UserMutationResult, validation_errors_to_message};
+use super::validation_errors_to_message;
 use crate::errors::{AuthError, DbError, ValidationErrorType};
 use crate::mutations::input_validators::SignInInput;
 use crate::types::authorized_user::AuthorizedUser;
@@ -7,75 +7,86 @@ use argon2::{
     password_hash::{PasswordHash, PasswordVerifier},
     Argon2,
 };
-use async_graphql::{Context, Result};
+use async_graphql::{Context, Object, Result, Union};
 use repositories::UserRepository;
 use sea_orm::*;
 use services::authentication::refresh_token::{cleanup_expired_tokens, create_refresh_token};
 use services::authentication::token::generate_token;
 use services::validation::input_validator::InputValidator;
 
-pub(super) async fn sign_in(
-    ctx: &Context<'_>,
-    input: SignInInput,
-) -> Result<UserMutationResult> {
-    let db = ctx.data::<DatabaseConnection>().unwrap();
+#[derive(Union)]
+pub enum SignInResult {
+    AuthorizedUser(AuthorizedUser),
+    ValidationError(ValidationErrorType),
+    AuthError(AuthError),
+    DbError(DbError),
+}
 
-    if let Err(validation_errors) = input.validate() {
-        return Ok(UserMutationResult::ValidationError(ValidationErrorType {
-            message: validation_errors_to_message(validation_errors),
-        }));
-    }
+#[derive(Default)]
+pub struct SignInMutation;
 
-    let user = match UserRepository::find_by_email_for_login(db, &input.email).await {
-        Ok(Some(user)) => user,
-        Ok(None) => {
-            tracing::warn!("signin failed: email not found");
-            return Ok(UserMutationResult::ValidationError(ValidationErrorType {
+#[Object]
+impl SignInMutation {
+    async fn sign_in(&self, ctx: &Context<'_>, input: SignInInput) -> Result<SignInResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        if let Err(validation_errors) = input.validate() {
+            return Ok(SignInResult::ValidationError(ValidationErrorType {
+                message: validation_errors_to_message(validation_errors),
+            }));
+        }
+
+        let user = match UserRepository::find_by_email_for_login(db, &input.email).await {
+            Ok(Some(user)) => user,
+            Ok(None) => {
+                tracing::warn!("signin failed: email not found");
+                return Ok(SignInResult::ValidationError(ValidationErrorType {
+                    message: "Email or password incorrect".to_string(),
+                }));
+            }
+            Err(e) => return Ok(SignInResult::DbError(DbError { message: e.to_string() })),
+        };
+
+        let parsed_hash = match PasswordHash::new(&user.password) {
+            Ok(hash) => hash,
+            Err(_) => {
+                return Ok(SignInResult::AuthError(AuthError {
+                    message: "Invalid password hash in database".to_string(),
+                }))
+            }
+        };
+
+        if Argon2::default()
+            .verify_password(&input.password.into_bytes(), &parsed_hash)
+            .is_err()
+        {
+            tracing::warn!("signin failed: wrong password");
+            return Ok(SignInResult::ValidationError(ValidationErrorType {
                 message: "Email or password incorrect".to_string(),
             }));
         }
-        Err(e) => return Ok(UserMutationResult::DbError(DbError { message: e.to_string() })),
-    };
 
-    let parsed_hash = match PasswordHash::new(&user.password) {
-        Ok(hash) => hash,
-        Err(_) => {
-            return Ok(UserMutationResult::AuthError(AuthError {
-                message: "Invalid password hash in database".to_string(),
-            }))
-        }
-    };
+        let refresh_token = match create_refresh_token(db, user.id, None).await {
+            Ok(token) => token,
+            Err(e) => {
+                return Ok(SignInResult::AuthError(AuthError {
+                    message: e.to_string(),
+                }))
+            }
+        };
 
-    if Argon2::default()
-        .verify_password(&input.password.into_bytes(), &parsed_hash)
-        .is_err()
-    {
-        tracing::warn!("signin failed: wrong password");
-        return Ok(UserMutationResult::ValidationError(ValidationErrorType {
-            message: "Email or password incorrect".to_string(),
-        }));
+        let _ = cleanup_expired_tokens(db).await;
+
+        let access_token = generate_token(&user);
+
+        set_auth_cookies(ctx, &access_token, &refresh_token);
+
+        tracing::info!(user_id = %user.id, "signin success");
+        Ok(SignInResult::AuthorizedUser(AuthorizedUser {
+            token: access_token,
+            refresh_token,
+        }))
     }
-
-    let refresh_token = match create_refresh_token(db, user.id, None).await {
-        Ok(token) => token,
-        Err(e) => {
-            return Ok(UserMutationResult::AuthError(AuthError {
-                message: e.to_string(),
-            }))
-        }
-    };
-
-    let _ = cleanup_expired_tokens(db).await;
-
-    let access_token = generate_token(&user);
-
-    set_auth_cookies(ctx, &access_token, &refresh_token);
-
-    tracing::info!(user_id = %user.id, "signin success");
-    Ok(UserMutationResult::AuthorizedUser(AuthorizedUser {
-        token: access_token,
-        refresh_token,
-    }))
 }
 
 #[cfg(test)]

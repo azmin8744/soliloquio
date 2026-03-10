@@ -1,43 +1,65 @@
-use super::{EmailVerifySuccess, UserMutation, UserMutationResult};
+use super::EmailVerifySuccess;
 use crate::errors::AuthError;
 use crate::utilities::requires_auth::RequiresAuth;
-use async_graphql::{Context, Result};
+use async_graphql::{Context, Object, Result, Union};
 use sea_orm::DatabaseConnection;
 use services::email::EmailService;
 use services::verification_token::{create_token, TokenKind};
 
-pub(super) async fn resend_verification_email(
-    mutation: &UserMutation,
-    ctx: &Context<'_>,
-) -> Result<UserMutationResult> {
-    let db = ctx.data::<DatabaseConnection>().unwrap();
+#[derive(Union)]
+pub enum ResendVerificationEmailResult {
+    EmailVerifySuccess(EmailVerifySuccess),
+    AuthError(AuthError),
+}
 
-    let user = match mutation.require_authenticate_as_user(ctx).await {
-        Ok(u) => u,
-        Err(e) => return Ok(UserMutationResult::AuthError(AuthError { message: e.to_string() })),
-    };
+#[derive(Default)]
+pub struct ResendVerificationEmailMutation;
 
-    if user.email_verified_at.is_some() {
-        return Ok(UserMutationResult::EmailVerifySuccess(EmailVerifySuccess {
-            message: "Email is already verified".to_string(),
-        }));
-    }
+impl RequiresAuth for ResendVerificationEmailMutation {}
 
-    if let Ok(email_service) = ctx.data::<EmailService>() {
-        match create_token(db, user.id, TokenKind::EmailVerification, 86400).await {
-            Ok(raw_token) => {
-                if let Err(e) = email_service
-                    .send_email_verification(&user.email, &raw_token)
-                    .await
-                {
-                    tracing::warn!(user_id = %user.id, error = %e, "failed to resend verification email");
-                }
+#[Object]
+impl ResendVerificationEmailMutation {
+    async fn resend_verification_email(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<ResendVerificationEmailResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        let user = match self.require_authenticate_as_user(ctx).await {
+            Ok(u) => u,
+            Err(e) => {
+                return Ok(ResendVerificationEmailResult::AuthError(AuthError {
+                    message: e.to_string(),
+                }))
             }
-            Err(e) => tracing::warn!(user_id = %user.id, error = %e.message, "failed to create verification token"),
-        }
-    }
+        };
 
-    Ok(UserMutationResult::EmailVerifySuccess(EmailVerifySuccess {
-        message: "Verification email sent".to_string(),
-    }))
+        if user.email_verified_at.is_some() {
+            return Ok(ResendVerificationEmailResult::EmailVerifySuccess(
+                EmailVerifySuccess {
+                    message: "Email is already verified".to_string(),
+                },
+            ));
+        }
+
+        if let Ok(email_service) = ctx.data::<EmailService>() {
+            match create_token(db, user.id, TokenKind::EmailVerification, 86400).await {
+                Ok(raw_token) => {
+                    if let Err(e) = email_service
+                        .send_email_verification(&user.email, &raw_token)
+                        .await
+                    {
+                        tracing::warn!(user_id = %user.id, error = %e, "failed to resend verification email");
+                    }
+                }
+                Err(e) => tracing::warn!(user_id = %user.id, error = %e.message, "failed to create verification token"),
+            }
+        }
+
+        Ok(ResendVerificationEmailResult::EmailVerifySuccess(
+            EmailVerifySuccess {
+                message: "Verification email sent".to_string(),
+            },
+        ))
+    }
 }

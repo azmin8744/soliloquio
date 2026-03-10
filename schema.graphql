@@ -13,6 +13,54 @@ type ApiKeyInfo {
 	createdAt: NaiveDateTime!
 }
 
+type Asset {
+	id: UUID!
+	originalFilename: String!
+	mimeType: String!
+	sizeBytes: Int!
+	createdAt: NaiveDateTime!
+	urls: AssetUrls!
+}
+
+type AssetConnection {
+	"""
+	Information to aid in pagination.
+	"""
+	pageInfo: PageInfo!
+	"""
+	A list of edges.
+	"""
+	edges: [AssetEdge!]!
+	"""
+	A list of nodes.
+	"""
+	nodes: [Asset!]!
+}
+
+"""
+An edge in a connection.
+"""
+type AssetEdge {
+	"""
+	The item at the end of the edge
+	"""
+	node: Asset!
+	"""
+	A cursor for use in pagination
+	"""
+	cursor: String!
+}
+
+union AssetMutationResult = DeletedAsset | DbError | AuthError
+
+type AssetUrls {
+	thumbnail: String!
+	small: String!
+	medium: String!
+	large: String!
+	original: String!
+}
+
 type AuthError {
 	message: String!
 }
@@ -28,6 +76,10 @@ input ChangePasswordInput {
 	newPassword: String!
 }
 
+union ChangePasswordResult = PasswordChangeSuccess | ValidationErrorType | AuthError | DbError
+
+union CreateApiKeyMutationResult = CreateApiKeyResult | AuthError | DbError
+
 type CreateApiKeyResult {
 	id: UUID!
 	label: String!
@@ -42,6 +94,10 @@ input DeletePostInput {
 	id: UUID!
 }
 
+type DeletedAsset {
+	id: UUID!
+}
+
 type DeletedPost {
 	id: UUID!
 }
@@ -51,25 +107,28 @@ type EmailVerifySuccess {
 }
 
 
+union ForgotPasswordResult = PasswordResetSuccess | DbError
+
 
 
 type Mutations {
 	addPost(newPost: AddPostInput!): PostMutationResult!
 	updatePost(post: UpdatePostInput!): PostMutationResult!
 	deletePost(post: DeletePostInput!): PostMutationResult!
-	signUp(input: SignUpInput!): UserMutationResult!
-	signIn(input: SignInInput!): UserMutationResult!
-	refreshAccessToken(refreshToken: String!): UserMutationResult!
+	signUp(input: SignUpInput!): SignUpResult!
+	signIn(input: SignInInput!): SignInResult!
+	refreshAccessToken(refreshToken: String!): RefreshAccessTokenResult!
 	logout(refreshToken: String!): Boolean!
 	logoutAllDevices(accessToken: String!): Boolean!
-	changePassword(input: ChangePasswordInput!): UserMutationResult!
-	updateUser(input: UpdateUserInput!): UserMutationResult!
-	forgotPassword(email: String!): UserMutationResult!
-	resetPassword(token: String!, newPassword: String!): UserMutationResult!
-	verifyEmail(token: String!): UserMutationResult!
-	resendVerificationEmail: UserMutationResult!
-	createApiKey(label: String!): UserMutationResult!
-	revokeApiKey(id: UUID!): UserMutationResult!
+	changePassword(input: ChangePasswordInput!): ChangePasswordResult!
+	forgotPassword(email: String!): ForgotPasswordResult!
+	resetPassword(token: String!, newPassword: String!): ResetPasswordResult!
+	verifyEmail(token: String!): VerifyEmailResult!
+	resendVerificationEmail: ResendVerificationEmailResult!
+	updateUser(input: UpdateUserInput!): UpdateUserResult!
+	createApiKey(label: String!): CreateApiKeyMutationResult!
+	revokeApiKey(id: UUID!): RevokeApiKeyMutationResult!
+	deleteAsset(id: UUID!): AssetMutationResult!
 }
 
 """
@@ -181,7 +240,16 @@ type Queries {
 	Get a specific post by ID for the authenticated user
 	"""
 	post(id: UUID!): Post
+	assets(after: String, first: Int): AssetConnection!
 }
+
+union RefreshAccessTokenResult = AuthorizedUser | AuthError
+
+union ResendVerificationEmailResult = EmailVerifySuccess | AuthError
+
+union ResetPasswordResult = PasswordChangeSuccess | AuthError | DbError
+
+union RevokeApiKeyMutationResult = RevokeApiKeyResult | AuthError | DbError
 
 type RevokeApiKeyResult {
 	id: UUID!
@@ -192,10 +260,14 @@ input SignInInput {
 	password: String!
 }
 
+union SignInResult = AuthorizedUser | ValidationErrorType | AuthError | DbError
+
 input SignUpInput {
 	email: String!
 	password: String!
 }
+
+union SignUpResult = AuthorizedUser | ValidationErrorType | AuthError | DbError
 
 enum SortDirection {
 	ASC
@@ -234,6 +306,8 @@ input UpdateUserInput {
 	bio: String
 }
 
+union UpdateUserResult = User | ValidationErrorType | AuthError | DbError
+
 type User {
 	id: UUID!
 	email: String!
@@ -244,11 +318,11 @@ type User {
 	updatedAt: NaiveDateTime
 }
 
-union UserMutationResult = AuthorizedUser | ValidationErrorType | DbError | AuthError | PasswordChangeSuccess | PasswordResetSuccess | EmailVerifySuccess | User | CreateApiKeyResult | RevokeApiKeyResult
-
 type ValidationErrorType {
 	message: String!
 }
+
+union VerifyEmailResult = EmailVerifySuccess | AuthError | DbError
 
 directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
 directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT

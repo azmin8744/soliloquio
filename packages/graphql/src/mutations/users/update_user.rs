@@ -1,84 +1,103 @@
-use super::{UserMutation, UserMutationResult, validation_errors_to_message};
+use super::validation_errors_to_message;
 use crate::errors::{AuthError, DbError, ValidationErrorType};
 use crate::mutations::input_validators::UpdateUserInput;
 use crate::types::user::User;
 use crate::utilities::requires_auth::RequiresAuth;
-use async_graphql::{Context, Result};
+use async_graphql::{Context, Object, Result, Union};
 use repositories::UserRepository;
 use sea_orm::*;
 use services::email::EmailService;
 use services::validation::input_validator::InputValidator;
 use services::verification_token::{create_token, TokenKind};
 
-pub(super) async fn update_user(
-    mutation: &UserMutation,
-    ctx: &Context<'_>,
-    input: UpdateUserInput,
-) -> Result<UserMutationResult> {
-    let db = ctx.data::<DatabaseConnection>().unwrap();
+#[derive(Union)]
+pub enum UpdateUserResult {
+    User(User),
+    ValidationError(ValidationErrorType),
+    AuthError(AuthError),
+    DbError(DbError),
+}
 
-    let current_user = match mutation.require_authenticate_as_user(ctx).await {
-        Ok(user) => user,
-        Err(e) => return Ok(UserMutationResult::AuthError(AuthError { message: e.to_string() })),
-    };
+#[derive(Default)]
+pub struct UpdateUserMutation;
 
-    if let Err(validation_errors) = input.validate() {
-        return Ok(UserMutationResult::ValidationError(ValidationErrorType {
-            message: validation_errors_to_message(validation_errors),
-        }));
-    }
+impl RequiresAuth for UpdateUserMutation {}
 
-    if let Ok(Some(existing)) = UserRepository::find_by_email(db, &input.email).await {
-        if existing.id != current_user.id {
-            return Ok(UserMutationResult::AuthError(AuthError {
-                message: "Email already in use".to_string(),
+#[Object]
+impl UpdateUserMutation {
+    async fn update_user(
+        &self,
+        ctx: &Context<'_>,
+        input: UpdateUserInput,
+    ) -> Result<UpdateUserResult> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+
+        let current_user = match self.require_authenticate_as_user(ctx).await {
+            Ok(user) => user,
+            Err(e) => return Ok(UpdateUserResult::AuthError(AuthError { message: e.to_string() })),
+        };
+
+        if let Err(validation_errors) = input.validate() {
+            return Ok(UpdateUserResult::ValidationError(ValidationErrorType {
+                message: validation_errors_to_message(validation_errors),
             }));
         }
-    }
 
-    let user_id = current_user.id;
-    let email_changed = current_user.email != input.email;
-    let updated = match UserRepository::update_email(db, current_user, input.email.clone(), email_changed).await {
-        Ok(u) => u,
-        Err(e) => return Ok(UserMutationResult::DbError(DbError { message: e.to_string() })),
-    };
-
-    if email_changed {
-        if let Ok(email_service) = ctx.data::<EmailService>() {
-            match create_token(db, user_id, TokenKind::EmailVerification, 86400).await {
-                Ok(raw_token) => {
-                    if let Err(e) = email_service
-                        .send_email_verification(&input.email, &raw_token)
-                        .await
-                    {
-                        tracing::warn!(user_id = %user_id, error = %e, "failed to send verification email after email change");
-                    }
-                }
-                Err(e) => tracing::warn!(user_id = %user_id, error = %e.message, "failed to create verification token"),
+        if let Ok(Some(existing)) = UserRepository::find_by_email(db, &input.email).await {
+            if existing.id != current_user.id {
+                return Ok(UpdateUserResult::AuthError(AuthError {
+                    message: "Email already in use".to_string(),
+                }));
             }
         }
-    }
 
-    let has_profile_update = input.display_name.is_some() || input.bio.is_some();
-    let final_user = if has_profile_update {
-        match UserRepository::update_profile(db, user_id, input.display_name, input.bio).await {
-            Ok(u) => u,
-            Err(e) => return Ok(UserMutationResult::DbError(DbError { message: e.to_string() })),
+        let user_id = current_user.id;
+        let email_changed = current_user.email != input.email;
+        let updated =
+            match UserRepository::update_email(db, current_user, input.email.clone(), email_changed)
+                .await
+            {
+                Ok(u) => u,
+                Err(e) => return Ok(UpdateUserResult::DbError(DbError { message: e.to_string() })),
+            };
+
+        if email_changed {
+            if let Ok(email_service) = ctx.data::<EmailService>() {
+                match create_token(db, user_id, TokenKind::EmailVerification, 86400).await {
+                    Ok(raw_token) => {
+                        if let Err(e) = email_service
+                            .send_email_verification(&input.email, &raw_token)
+                            .await
+                        {
+                            tracing::warn!(user_id = %user_id, error = %e, "failed to send verification email after email change");
+                        }
+                    }
+                    Err(e) => tracing::warn!(user_id = %user_id, error = %e.message, "failed to create verification token"),
+                }
+            }
         }
-    } else {
-        updated
-    };
 
-    tracing::info!(user_id = %user_id, "user updated");
-    Ok(UserMutationResult::User(User {
-        id: final_user.id,
-        email: final_user.email,
-        email_verified_at: final_user.email_verified_at,
-        display_name: final_user.display_name,
-        bio: final_user.bio,
-        created_at: final_user.created_at,
-        updated_at: final_user.updated_at,
-    }))
+        let has_profile_update = input.display_name.is_some() || input.bio.is_some();
+        let final_user = if has_profile_update {
+            match UserRepository::update_profile(db, user_id, input.display_name, input.bio).await {
+                Ok(u) => u,
+                Err(e) => return Ok(UpdateUserResult::DbError(DbError { message: e.to_string() })),
+            }
+        } else {
+            updated
+        };
+
+        tracing::info!(user_id = %user_id, "user updated");
+        Ok(UpdateUserResult::User(User {
+            id: final_user.id,
+            email: final_user.email,
+            email_verified_at: final_user.email_verified_at,
+            display_name: final_user.display_name,
+            bio: final_user.bio,
+            created_at: final_user.created_at,
+            updated_at: final_user.updated_at,
+        }))
+    }
 }
 
 #[cfg(test)]

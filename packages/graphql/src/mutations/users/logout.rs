@@ -1,26 +1,29 @@
-use crate::utilities::cookies::clear_auth_cookies;
 use crate::errors::AuthError;
-use async_graphql::{Context, Result};
+use crate::utilities::cookies::clear_auth_cookies;
+use async_graphql::{Context, Object, Result};
 use sea_orm::DatabaseConnection;
 use services::authentication::refresh_token::{cleanup_expired_tokens, revoke_refresh_token};
 
-pub(super) async fn logout(
-    ctx: &Context<'_>,
-    refresh_token: String,
-) -> Result<bool, AuthError> {
-    let db = ctx.data::<DatabaseConnection>().unwrap();
+#[derive(Default)]
+pub struct LogoutMutation;
 
-    revoke_refresh_token(db, &refresh_token)
-        .await
-        .map_err(|e| AuthError { message: e.message })?;
+#[Object]
+impl LogoutMutation {
+    async fn logout(&self, ctx: &Context<'_>, refresh_token: String) -> Result<bool, AuthError> {
+        let db = ctx.data::<DatabaseConnection>().unwrap();
 
-    clear_auth_cookies(ctx);
+        revoke_refresh_token(db, &refresh_token)
+            .await
+            .map_err(|e| AuthError { message: e.message })?;
 
-    tracing::info!("logout");
+        clear_auth_cookies(ctx);
 
-    let _ = cleanup_expired_tokens(db).await;
+        tracing::info!("logout");
 
-    Ok(true)
+        let _ = cleanup_expired_tokens(db).await;
+
+        Ok(true)
+    }
 }
 
 #[cfg(test)]
