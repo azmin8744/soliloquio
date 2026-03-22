@@ -28,12 +28,14 @@ impl PublicPost {
     async fn updated_at(&self) -> NaiveDateTime { self.updated_at }
 
     /// Rendered HTML content
+    #[graphql(complexity = 5)]
     async fn content(&self, ctx: &Context<'_>) -> String {
         let default_cache = MarkdownCache::default();
         let cache = ctx.data::<MarkdownCache>().unwrap_or(&default_cache);
         render_markdown_cached(self.id, &self.markdown_content, cache)
     }
 
+    #[graphql(complexity = 3)]
     async fn author(&self, ctx: &Context<'_>) -> Result<PublicAuthor> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
         let user = users::Entity::find_by_id(self.user_id)

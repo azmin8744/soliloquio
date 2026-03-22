@@ -39,6 +39,7 @@ pub struct PublicQueryRoot;
 
 #[Object]
 impl PublicQueryRoot {
+    #[graphql(complexity = "first.unwrap_or(10) as usize * child_complexity")]
     async fn posts(
         &self,
         ctx: &Context<'_>,
