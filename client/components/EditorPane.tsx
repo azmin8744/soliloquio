@@ -153,7 +153,7 @@ export function EditorPane({
             {/* Body + icon strip */}
             <div class="relative flex-1 flex flex-col">
               {/* Floating icon strip — scoped to body, below divider */}
-              <div class="absolute right-0 top-0 h-full flex flex-col items-center pt-3 gap-2 z-10 w-11">
+              <div class="absolute right-0 top-0 h-full flex flex-col items-center pt-3 gap-2 z-10 w-16">
                 {/* Metadata icon */}
                 <button
                   type="button"
