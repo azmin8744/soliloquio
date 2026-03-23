@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use data_access_objects::PostDao;
 use models::posts::Model;
 use sea_orm::entity::prelude::Uuid;
@@ -102,6 +103,26 @@ impl PostRepository {
         let cursors: Vec<String> = rows.iter().map(|p| encode_cursor(&sort_by, p)).collect();
 
         Ok(PaginatedPosts { posts: rows, cursors, has_previous_page, has_next_page })
+    }
+
+    pub async fn get_prev_published_post(
+        db: &DatabaseConnection,
+        user_id: Uuid,
+        before: NaiveDateTime,
+    ) -> Result<Option<Model>, String> {
+        PostDao::find_prev_published(db, user_id, before)
+            .await
+            .map_err(|e| format!("Database error: {}", e))
+    }
+
+    pub async fn get_next_published_post(
+        db: &DatabaseConnection,
+        user_id: Uuid,
+        after: NaiveDateTime,
+    ) -> Result<Option<Model>, String> {
+        PostDao::find_next_published(db, user_id, after)
+            .await
+            .map_err(|e| format!("Database error: {}", e))
     }
 }
 
@@ -358,5 +379,113 @@ mod tests {
         assert!(!page2.has_next_page);
 
         cleanup_user_by_email(&db, &email).await;
+    }
+
+    // ============= adjacent published post tests =============
+
+    #[tokio::test]
+    async fn test_prev_post_returns_nearest_older() {
+        let db = setup_test_db().await;
+        let (user, email) = create_test_user(&db, "adj_prev").await;
+
+        create_test_post(&db, user.id, "Old", "c", true).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        let mid = create_test_post(&db, user.id, "Mid", "c", true).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        create_test_post(&db, user.id, "New", "c", true).await;
+
+        let result = PostRepository::get_prev_published_post(
+            &db, user.id, mid.first_published_at.unwrap(),
+        ).await.unwrap();
+
+        assert_eq!(result.unwrap().title, "Old");
+        cleanup_user_by_email(&db, &email).await;
+    }
+
+    #[tokio::test]
+    async fn test_next_post_returns_nearest_newer() {
+        let db = setup_test_db().await;
+        let (user, email) = create_test_user(&db, "adj_next").await;
+
+        create_test_post(&db, user.id, "Old", "c", true).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        let mid = create_test_post(&db, user.id, "Mid", "c", true).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        create_test_post(&db, user.id, "New", "c", true).await;
+
+        let result = PostRepository::get_next_published_post(
+            &db, user.id, mid.first_published_at.unwrap(),
+        ).await.unwrap();
+
+        assert_eq!(result.unwrap().title, "New");
+        cleanup_user_by_email(&db, &email).await;
+    }
+
+    #[tokio::test]
+    async fn test_prev_post_none_on_oldest() {
+        let db = setup_test_db().await;
+        let (user, email) = create_test_user(&db, "adj_prev_none").await;
+
+        let oldest = create_test_post(&db, user.id, "Only", "c", true).await;
+
+        let result = PostRepository::get_prev_published_post(
+            &db, user.id, oldest.first_published_at.unwrap(),
+        ).await.unwrap();
+
+        assert!(result.is_none());
+        cleanup_user_by_email(&db, &email).await;
+    }
+
+    #[tokio::test]
+    async fn test_next_post_none_on_newest() {
+        let db = setup_test_db().await;
+        let (user, email) = create_test_user(&db, "adj_next_none").await;
+
+        let newest = create_test_post(&db, user.id, "Only", "c", true).await;
+
+        let result = PostRepository::get_next_published_post(
+            &db, user.id, newest.first_published_at.unwrap(),
+        ).await.unwrap();
+
+        assert!(result.is_none());
+        cleanup_user_by_email(&db, &email).await;
+    }
+
+    #[tokio::test]
+    async fn test_prev_post_skips_unpublished() {
+        let db = setup_test_db().await;
+        let (user, email) = create_test_user(&db, "adj_prev_unpub").await;
+
+        create_test_post(&db, user.id, "Published Old", "c", true).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        create_test_post(&db, user.id, "Draft", "c", false).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        let newest = create_test_post(&db, user.id, "Published New", "c", true).await;
+
+        let result = PostRepository::get_prev_published_post(
+            &db, user.id, newest.first_published_at.unwrap(),
+        ).await.unwrap();
+
+        assert_eq!(result.unwrap().title, "Published Old");
+        cleanup_user_by_email(&db, &email).await;
+    }
+
+    #[tokio::test]
+    async fn test_adjacent_posts_isolated_by_user() {
+        let db = setup_test_db().await;
+        let (user_a, email_a) = create_test_user(&db, "adj_iso_a").await;
+        let (user_b, email_b) = create_test_user(&db, "adj_iso_b").await;
+
+        create_test_post(&db, user_b.id, "B Old", "c", true).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        let a_post = create_test_post(&db, user_a.id, "A Only", "c", true).await;
+
+        let result = PostRepository::get_prev_published_post(
+            &db, user_a.id, a_post.first_published_at.unwrap(),
+        ).await.unwrap();
+
+        assert!(result.is_none());
+        cleanup_user_by_email(&db, &email_a).await;
+        cleanup_user_by_email(&db, &email_b).await;
     }
 }

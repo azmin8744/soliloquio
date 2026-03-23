@@ -1,4 +1,5 @@
 use crate::ownership::{verify_ownership, OwnedEntity};
+use chrono::NaiveDateTime;
 use models::posts::{ActiveModel, Column, Entity, Model};
 use models::prelude::Posts;
 use sea_orm::entity::prelude::Uuid;
@@ -93,6 +94,34 @@ impl PostDao {
             .order_by(Column::Id, order)
             .limit(limit)
             .all(db)
+            .await
+    }
+
+    pub async fn find_prev_published(
+        db: &DatabaseConnection,
+        user_id: Uuid,
+        before: NaiveDateTime,
+    ) -> Result<Option<Model>, DbErr> {
+        Posts::find()
+            .filter(Column::UserId.eq(user_id))
+            .filter(Column::IsPublished.eq(true))
+            .filter(Column::FirstPublishedAt.lt(before))
+            .order_by_desc(Column::FirstPublishedAt)
+            .one(db)
+            .await
+    }
+
+    pub async fn find_next_published(
+        db: &DatabaseConnection,
+        user_id: Uuid,
+        after: NaiveDateTime,
+    ) -> Result<Option<Model>, DbErr> {
+        Posts::find()
+            .filter(Column::UserId.eq(user_id))
+            .filter(Column::IsPublished.eq(true))
+            .filter(Column::FirstPublishedAt.gt(after))
+            .order_by_asc(Column::FirstPublishedAt)
+            .one(db)
             .await
     }
 

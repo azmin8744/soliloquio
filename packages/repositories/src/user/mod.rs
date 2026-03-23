@@ -30,6 +30,13 @@ impl UserRepository {
         UserDao::insert(db, model).await.map_err(|e| e.to_string())
     }
 
+    pub async fn find_by_id(
+        db: &DatabaseConnection,
+        id: Uuid,
+    ) -> Result<Option<Model>, DbErr> {
+        UserDao::find_by_id(db, id).await
+    }
+
     pub async fn find_by_email(
         db: &DatabaseConnection,
         email: &str,

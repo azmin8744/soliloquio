@@ -1,8 +1,8 @@
 use crate::utilities::markdown::{render_markdown_cached, MarkdownCache};
 use async_graphql::{Context, Object, Result, SimpleObject};
 use chrono::NaiveDateTime;
-use models::users;
-use sea_orm::*;
+use repositories::{PostRepository, UserRepository};
+use sea_orm::DatabaseConnection;
 use uuid::Uuid;
 
 pub struct PublicPost {
@@ -35,16 +35,53 @@ impl PublicPost {
         render_markdown_cached(self.id, &self.markdown_content, cache)
     }
 
+    #[graphql(complexity = 2)]
+    async fn prev_post(&self, ctx: &Context<'_>) -> Result<Option<PublicPostSummary>> {
+        let Some(pub_at) = self.first_published_at else { return Ok(None) };
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+        let post = PostRepository::get_prev_published_post(db, self.user_id, pub_at)
+            .await
+            .map_err(async_graphql::Error::new)?;
+        Ok(post.map(|p| PublicPostSummary {
+            id: p.id,
+            title: p.title,
+            slug: p.slug,
+            first_published_at: p.first_published_at,
+        }))
+    }
+
+    #[graphql(complexity = 2)]
+    async fn next_post(&self, ctx: &Context<'_>) -> Result<Option<PublicPostSummary>> {
+        let Some(pub_at) = self.first_published_at else { return Ok(None) };
+        let db = ctx.data::<DatabaseConnection>().unwrap();
+        let post = PostRepository::get_next_published_post(db, self.user_id, pub_at)
+            .await
+            .map_err(async_graphql::Error::new)?;
+        Ok(post.map(|p| PublicPostSummary {
+            id: p.id,
+            title: p.title,
+            slug: p.slug,
+            first_published_at: p.first_published_at,
+        }))
+    }
+
     #[graphql(complexity = 3)]
     async fn author(&self, ctx: &Context<'_>) -> Result<PublicAuthor> {
         let db = ctx.data::<DatabaseConnection>().unwrap();
-        let user = users::Entity::find_by_id(self.user_id)
-            .one(db)
+        let user = UserRepository::find_by_id(db, self.user_id)
             .await
             .map_err(|e| async_graphql::Error::new(e.to_string()))?
             .ok_or_else(|| async_graphql::Error::new("Author not found"))?;
         Ok(PublicAuthor { id: user.id, display_name: user.display_name, bio: user.bio })
     }
+}
+
+#[derive(SimpleObject)]
+pub struct PublicPostSummary {
+    pub id: Uuid,
+    pub title: String,
+    pub slug: Option<String>,
+    pub first_published_at: Option<NaiveDateTime>,
 }
 
 #[derive(SimpleObject)]

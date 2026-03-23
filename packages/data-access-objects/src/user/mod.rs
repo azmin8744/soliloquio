@@ -1,6 +1,7 @@
 use models::users::{ActiveModel, Column, Entity, Model};
 use models::prelude::Users;
 use sea_orm::*;
+use uuid::Uuid;
 
 pub struct UserDao;
 
@@ -15,6 +16,13 @@ impl UserDao {
             .one(db)
             .await?
             .ok_or(DbErr::Custom("Inserted user not found".to_string()))
+    }
+
+    pub async fn find_by_id(
+        db: &DatabaseConnection,
+        id: Uuid,
+    ) -> Result<Option<Model>, DbErr> {
+        Users::find_by_id(id).one(db).await
     }
 
     pub async fn find_by_email(
