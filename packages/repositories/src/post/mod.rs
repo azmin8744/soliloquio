@@ -18,6 +18,7 @@ pub enum PostSortBy {
     CreatedAt,
     UpdatedAt,
     Title,
+    FirstPublishedAt,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -38,6 +39,7 @@ fn sort_tag(sort_by: &PostSortBy) -> &'static str {
         PostSortBy::CreatedAt => "c",
         PostSortBy::UpdatedAt => "u",
         PostSortBy::Title => "t",
+        PostSortBy::FirstPublishedAt => "p",
     }
 }
 
@@ -46,6 +48,7 @@ fn sort_column(sort_by: &PostSortBy) -> Column {
         PostSortBy::CreatedAt => Column::CreatedAt,
         PostSortBy::UpdatedAt => Column::UpdatedAt,
         PostSortBy::Title => Column::Title,
+        PostSortBy::FirstPublishedAt => Column::FirstPublishedAt,
     }
 }
 
@@ -54,6 +57,11 @@ fn encode_cursor(sort_by: &PostSortBy, post: &Model) -> String {
         PostSortBy::CreatedAt => post.created_at.and_utc().to_rfc3339(),
         PostSortBy::UpdatedAt => post.updated_at.and_utc().to_rfc3339(),
         PostSortBy::Title => post.title.clone(),
+        PostSortBy::FirstPublishedAt => post
+            .first_published_at
+            .expect("first_published_at must be set for published posts")
+            .and_utc()
+            .to_rfc3339(),
     };
     let cursor = PostCursor {
         s: sort_tag(sort_by).to_string(),
@@ -87,7 +95,7 @@ fn build_keyset_filter(
     let col = sort_column(sort_by);
 
     let cursor_val: sea_orm::Value = match sort_by {
-        PostSortBy::CreatedAt | PostSortBy::UpdatedAt => {
+        PostSortBy::CreatedAt | PostSortBy::UpdatedAt | PostSortBy::FirstPublishedAt => {
             let dt = chrono::DateTime::parse_from_rfc3339(&pc.v)
                 .map_err(|_| "Invalid cursor".to_string())?;
             dt.naive_utc().into()

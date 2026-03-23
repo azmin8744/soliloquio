@@ -1,12 +1,35 @@
 use super::types::{PublicAuthor, PublicPost};
-use crate::types::sort::{PostSortBy, SortDirection};
+use crate::types::sort::SortDirection;
 use async_graphql::connection::{Connection, Edge, EmptyFields};
-use async_graphql::{Context, Object, Result};
+use async_graphql::{Context, Enum, Object, Result};
 use models::{posts, users};
 use repositories::PostRepository;
 use sea_orm::entity::prelude::Uuid;
 use sea_orm::*;
 use services::api_keys as api_key_service;
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug)]
+pub enum PublicPostSortBy {
+    #[graphql(name = "CREATED_AT")]
+    CreatedAt,
+    #[graphql(name = "UPDATED_AT")]
+    UpdatedAt,
+    #[graphql(name = "TITLE")]
+    Title,
+    #[graphql(name = "FIRST_PUBLISHED_AT")]
+    FirstPublishedAt,
+}
+
+impl From<PublicPostSortBy> for repositories::PostSortBy {
+    fn from(v: PublicPostSortBy) -> Self {
+        match v {
+            PublicPostSortBy::CreatedAt => Self::CreatedAt,
+            PublicPostSortBy::UpdatedAt => Self::UpdatedAt,
+            PublicPostSortBy::Title => Self::Title,
+            PublicPostSortBy::FirstPublishedAt => Self::FirstPublishedAt,
+        }
+    }
+}
 
 pub struct PublicApiKey(pub String);
 
@@ -45,7 +68,7 @@ impl PublicQueryRoot {
         ctx: &Context<'_>,
         after: Option<String>,
         first: Option<i32>,
-        sort_by: Option<PostSortBy>,
+        sort_by: Option<PublicPostSortBy>,
         sort_direction: Option<SortDirection>,
         search: Option<String>,
     ) -> Result<Connection<String, PublicPost, EmptyFields, EmptyFields>> {
@@ -64,7 +87,7 @@ impl PublicQueryRoot {
             return Ok(conn);
         }
 
-        let sort_by = sort_by.unwrap_or(PostSortBy::CreatedAt);
+        let sort_by = sort_by.unwrap_or(PublicPostSortBy::CreatedAt);
         let sort_dir = sort_direction.unwrap_or(SortDirection::Desc);
 
         let result = PostRepository::get_published_posts(

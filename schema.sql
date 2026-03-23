@@ -53,6 +53,7 @@ alter table posts add constraint fk_user_id foreign key (user_id) references use
 create index idx_posts_user_pagination on posts (user_id, created_at desc, id desc);
 create index idx_posts_user_updated_at on posts (user_id, updated_at desc, id desc);
 create index idx_posts_user_title on posts (user_id, title asc, id asc);
+create index idx_posts_user_first_published on posts (user_id, first_published_at desc, id desc) where first_published_at is not null;
 create unique index idx_posts_user_slug on posts (user_id, slug);
 
 create index idx_vt_token_hash on verification_tokens(token_hash);
