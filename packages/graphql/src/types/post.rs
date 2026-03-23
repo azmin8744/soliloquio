@@ -9,6 +9,7 @@ pub struct Post {
     pub markdown_content: String,
     pub description: Option<String>,
     pub slug: Option<String>,
+    pub cover_image: Option<String>,
     pub is_published: bool,
     pub first_published_at: Option<NaiveDateTime>,
     pub created_at: NaiveDateTime,
@@ -47,6 +48,10 @@ impl Post {
 
     async fn slug(&self) -> Option<&String> {
         self.slug.as_ref()
+    }
+
+    async fn cover_image(&self) -> Option<&String> {
+        self.cover_image.as_ref()
     }
 
     /// Returns the original markdown content for editing

@@ -11,6 +11,7 @@ export interface Post {
   content: string;
   description?: string;
   slug?: string;
+  coverImage?: string;
 }
 
 export interface DeletedPost {

@@ -3,6 +3,7 @@ use crate::errors::{AuthError, DbError};
 use crate::utilities::requires_auth::RequiresAuth;
 use async_graphql::{Context, Result};
 use sea_orm::*;
+use url::Url;
 
 pub(super) async fn add_post(
     mutation: &PostMutation,
@@ -23,6 +24,10 @@ pub(super) async fn add_post(
         }));
     }
 
+    if let Some(ref url) = new_post.cover_image {
+        Url::parse(url).map_err(|_| async_graphql::Error::new("cover_image must be a valid URL"))?;
+    }
+
     let db = ctx.data::<DatabaseConnection>().unwrap();
     let is_published = new_post.is_published.unwrap_or(false);
 
@@ -34,6 +39,7 @@ pub(super) async fn add_post(
         is_published,
         new_post.description,
         new_post.slug,
+        new_post.cover_image,
     )
     .await
     {

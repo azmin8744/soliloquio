@@ -23,6 +23,7 @@ struct AddPostInput {
     is_published: Option<bool>,
     description: Option<String>,
     slug: Option<String>,
+    cover_image: Option<String>,
 }
 
 #[derive(InputObject)]
@@ -33,6 +34,7 @@ struct UpdatePostInput {
     is_published: Option<bool>,
     description: Option<String>,
     slug: Option<String>,
+    cover_image: Option<String>,
 }
 
 #[derive(InputObject)]
@@ -47,6 +49,7 @@ fn model_to_post_type(p: &models::posts::Model) -> PostType {
         markdown_content: p.markdown_content.clone().unwrap_or_default(),
         description: p.description.clone(),
         slug: p.slug.clone(),
+        cover_image: p.cover_image.clone(),
         is_published: p.is_published,
         first_published_at: p.first_published_at,
         created_at: p.created_at,

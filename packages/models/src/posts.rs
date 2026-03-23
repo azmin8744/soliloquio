@@ -15,6 +15,8 @@ pub struct Model {
     pub description: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub slug: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub cover_image: Option<String>,
     pub user_id: Uuid,
     pub is_published: bool,
     pub first_published_at: Option<DateTime>,

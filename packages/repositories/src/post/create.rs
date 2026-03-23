@@ -14,6 +14,7 @@ impl PostRepository {
         is_published: bool,
         description: Option<String>,
         slug: Option<String>,
+        cover_image: Option<String>,
     ) -> Result<posts::Model, String> {
         let first_published_at = if is_published {
             Some(chrono::Utc::now().naive_utc())
@@ -32,6 +33,7 @@ impl PostRepository {
                     first_published_at: ActiveValue::set(first_published_at),
                     description: ActiveValue::set(description),
                     slug: ActiveValue::set(None),
+                    cover_image: ActiveValue::set(cover_image),
                     ..Default::default()
                 };
                 PostDao::insert(db, model)
@@ -55,6 +57,7 @@ impl PostRepository {
                         first_published_at: ActiveValue::set(first_published_at),
                         description: ActiveValue::set(description.clone()),
                         slug: ActiveValue::set(Some(candidate)),
+                        cover_image: ActiveValue::set(cover_image.clone()),
                         ..Default::default()
                     };
 
@@ -89,7 +92,7 @@ mod tests {
         let (user, email) = create_test_user(&db, "repo_create").await;
 
         let post = PostRepository::create_post(
-            &db, user.id, "MD Post".into(), "# Heading".into(), false, None, None,
+            &db, user.id, "MD Post".into(), "# Heading".into(), false, None, None, None,
         ).await.unwrap();
 
         assert_eq!(post.title, "MD Post");
@@ -104,7 +107,7 @@ mod tests {
         let (user, email) = create_test_user(&db, "repo_unpub").await;
 
         let post = PostRepository::create_post(
-            &db, user.id, "Unpub".into(), "c".into(), false, None, None,
+            &db, user.id, "Unpub".into(), "c".into(), false, None, None, None,
         ).await.unwrap();
 
         assert!(!post.is_published);
@@ -119,7 +122,7 @@ mod tests {
         let (user, email) = create_test_user(&db, "repo_pub").await;
 
         let post = PostRepository::create_post(
-            &db, user.id, "Pub".into(), "c".into(), true, None, None,
+            &db, user.id, "Pub".into(), "c".into(), true, None, None, None,
         ).await.unwrap();
 
         assert!(post.is_published);
@@ -134,7 +137,7 @@ mod tests {
         let (user, email) = create_test_user(&db, "repo_fields").await;
 
         let post = PostRepository::create_post(
-            &db, user.id, "Return Test".into(), "body".into(), false, None, None,
+            &db, user.id, "Return Test".into(), "body".into(), false, None, None, None,
         ).await.unwrap();
 
         assert!(!post.id.is_nil());
@@ -151,7 +154,7 @@ mod tests {
         let (user, email) = create_test_user(&db, "repo_slug_null").await;
 
         let post = PostRepository::create_post(
-            &db, user.id, "Hello World".into(), "".into(), false, None, None,
+            &db, user.id, "Hello World".into(), "".into(), false, None, None, None,
         ).await.unwrap();
 
         assert!(post.slug.is_none());
@@ -165,7 +168,7 @@ mod tests {
         let (user, email) = create_test_user(&db, "repo_slug_custom").await;
 
         let post = PostRepository::create_post(
-            &db, user.id, "Title".into(), "".into(), false, None, Some("my-custom-slug".into()),
+            &db, user.id, "Title".into(), "".into(), false, None, Some("my-custom-slug".into()), None,
         ).await.unwrap();
 
         assert_eq!(post.slug.as_deref(), Some("my-custom-slug"));
@@ -179,10 +182,10 @@ mod tests {
         let (user, email) = create_test_user(&db, "repo_slug_dedup").await;
 
         let p1 = PostRepository::create_post(
-            &db, user.id, "P1".into(), "".into(), false, None, Some("my-slug".into()),
+            &db, user.id, "P1".into(), "".into(), false, None, Some("my-slug".into()), None,
         ).await.unwrap();
         let p2 = PostRepository::create_post(
-            &db, user.id, "P2".into(), "".into(), false, None, Some("my-slug".into()),
+            &db, user.id, "P2".into(), "".into(), false, None, Some("my-slug".into()), None,
         ).await.unwrap();
 
         assert_ne!(p1.slug, p2.slug);

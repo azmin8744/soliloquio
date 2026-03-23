@@ -4,6 +4,7 @@ create table posts (
     markdown_content text,
     description text,
     slug text,
+    cover_image text,
     user_id uuid not null,
     is_published boolean default false not null,
     first_published_at timestamp,

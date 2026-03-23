@@ -50,6 +50,7 @@ fn model_to_public_post(p: &models::posts::Model) -> PublicPost {
         title: p.title.clone(),
         description: p.description.clone(),
         slug: p.slug.clone(),
+        cover_image: p.cover_image.clone(),
         markdown_content: p.markdown_content.clone().unwrap_or_default(),
         first_published_at: p.first_published_at,
         created_at: p.created_at,

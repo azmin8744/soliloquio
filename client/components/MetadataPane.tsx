@@ -8,6 +8,7 @@ interface MetadataPaneProps {
   activeTab: MetaPaneTab;
   buffer: EditorBuffer;
   onBufferChange: (partial: Partial<EditorBuffer>) => void;
+  onSwitchToImages: () => void;
 }
 
 type SizeKey = keyof AssetUrls;
@@ -19,7 +20,14 @@ const SIZE_LABELS: { key: SizeKey; label: string }[] = [
   { key: "original", label: "Original" },
 ];
 
-function ImageTile({ asset }: { asset: Asset }) {
+interface ImageTileProps {
+  asset: Asset;
+  isCover: boolean;
+  onSetCover: (url: string) => void;
+  onClearCover: () => void;
+}
+
+function ImageTile({ asset, isCover, onSetCover, onClearCover }: ImageTileProps) {
   const [showSizes, setShowSizes] = useState(false);
 
   const handleInsert = (sizeKey: SizeKey) => {
@@ -36,8 +44,14 @@ function ImageTile({ asset }: { asset: Asset }) {
         alt={asset.originalFilename}
         class="w-full h-full object-cover"
       />
+      {/* Cover badge */}
+      {isCover && (
+        <div class="absolute top-1 left-1 px-1.5 py-0.5 text-xs font-semibold bg-indigo-600 text-white rounded">
+          Cover
+        </div>
+      )}
       {/* Hover overlay */}
-      <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
         <button
           type="button"
           onClick={() => setShowSizes(true)}
@@ -45,6 +59,25 @@ function ImageTile({ asset }: { asset: Asset }) {
         >
           Insert
         </button>
+        {isCover
+          ? (
+            <button
+              type="button"
+              onClick={onClearCover}
+              class="px-2 py-1 text-xs font-medium text-white bg-gray-600 rounded hover:bg-gray-700"
+            >
+              Remove
+            </button>
+          )
+          : (
+            <button
+              type="button"
+              onClick={() => onSetCover(`${globalThis.location.origin}${asset.urls.large}`)}
+              class="px-2 py-1 text-xs font-medium text-white bg-emerald-600 rounded hover:bg-emerald-700"
+            >
+              Set cover
+            </button>
+          )}
       </div>
       {/* Size dropdown */}
       {showSizes && (
@@ -76,13 +109,44 @@ function ImageTile({ asset }: { asset: Asset }) {
 }
 
 function MetaTab(
-  { buffer, onBufferChange }: Pick<
+  { buffer, onBufferChange, onSwitchToImages }: Pick<
     MetadataPaneProps,
-    "buffer" | "onBufferChange"
+    "buffer" | "onBufferChange" | "onSwitchToImages"
   >,
 ) {
   return (
     <div class="flex flex-col gap-3 p-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">
+          Cover image
+        </label>
+        {buffer.coverImage
+          ? (
+            <div class="relative rounded overflow-hidden bg-gray-100">
+              <img
+                src={buffer.coverImage}
+                alt="Cover"
+                class="w-full h-24 object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => onBufferChange({ coverImage: "" })}
+                class="absolute top-1 right-1 px-1.5 py-0.5 text-xs font-medium bg-black/60 text-white rounded hover:bg-black/80"
+              >
+                Remove
+              </button>
+            </div>
+          )
+          : (
+            <button
+              type="button"
+              onClick={onSwitchToImages}
+              class="w-full px-2 py-2 text-xs text-indigo-600 border border-dashed border-indigo-300 rounded hover:bg-indigo-50 text-center"
+            >
+              Pick from Images →
+            </button>
+          )}
+      </div>
       <div>
         <label class="block text-xs font-medium text-gray-500 mb-1">Slug</label>
         <input
@@ -113,7 +177,9 @@ function MetaTab(
   );
 }
 
-function ImagesTab() {
+function ImagesTab(
+  { buffer, onBufferChange }: Pick<MetadataPaneProps, "buffer" | "onBufferChange">,
+) {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useAssets();
   const upload = useUploadAsset();
   const assets = data?.pages.flatMap((p) => p.nodes) ?? [];
@@ -139,7 +205,15 @@ function ImagesTab() {
       </div>
       <div class="flex-1 overflow-y-auto p-3">
         <div class="grid grid-cols-2 gap-2">
-          {assets.map((asset) => <ImageTile key={asset.id} asset={asset} />)}
+          {assets.map((asset) => (
+            <ImageTile
+              key={asset.id}
+              asset={asset}
+              isCover={!!buffer.coverImage && buffer.coverImage === `${globalThis.location.origin}${asset.urls.large}`}
+              onSetCover={(url) => onBufferChange({ coverImage: url })}
+              onClearCover={() => onBufferChange({ coverImage: "" })}
+            />
+          ))}
         </div>
         {hasNextPage && (
           <button
@@ -160,13 +234,19 @@ function ImagesTab() {
 }
 
 export function MetadataPane(
-  { activeTab, buffer, onBufferChange }: MetadataPaneProps,
+  { activeTab, buffer, onBufferChange, onSwitchToImages }: MetadataPaneProps,
 ) {
   return (
     <div class="w-72 border-l border-gray-200 bg-white flex flex-col overflow-y-auto">
       {activeTab === "meta"
-        ? <MetaTab buffer={buffer} onBufferChange={onBufferChange} />
-        : <ImagesTab />}
+        ? (
+          <MetaTab
+            buffer={buffer}
+            onBufferChange={onBufferChange}
+            onSwitchToImages={onSwitchToImages}
+          />
+        )
+        : <ImagesTab buffer={buffer} onBufferChange={onBufferChange} />}
     </div>
   );
 }

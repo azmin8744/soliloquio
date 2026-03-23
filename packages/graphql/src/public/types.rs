@@ -11,6 +11,7 @@ pub struct PublicPost {
     pub title: String,
     pub description: Option<String>,
     pub slug: Option<String>,
+    pub cover_image: Option<String>,
     pub markdown_content: String,
     pub first_published_at: Option<NaiveDateTime>,
     pub created_at: NaiveDateTime,
@@ -23,6 +24,7 @@ impl PublicPost {
     async fn title(&self) -> &str { &self.title }
     async fn description(&self) -> Option<&str> { self.description.as_deref() }
     async fn slug(&self) -> Option<&str> { self.slug.as_deref() }
+    async fn cover_image(&self) -> Option<&str> { self.cover_image.as_deref() }
     async fn first_published_at(&self) -> Option<NaiveDateTime> { self.first_published_at }
     async fn created_at(&self) -> NaiveDateTime { self.created_at }
     async fn updated_at(&self) -> NaiveDateTime { self.updated_at }

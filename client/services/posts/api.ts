@@ -22,6 +22,7 @@ const ADD_POST_MUTATION = `
         isPublished
         description
         slug
+        coverImage
         createdAt
         updatedAt
       }
@@ -46,6 +47,7 @@ const UPDATE_POST_MUTATION = `
         isPublished
         description
         slug
+        coverImage
         createdAt
         updatedAt
       }
@@ -92,6 +94,7 @@ const GET_POSTS_QUERY = `
         content
         slug
         description
+        coverImage
       }
     }
   }
@@ -109,6 +112,7 @@ const GET_POST_QUERY = `
       updatedAt
       slug
       description
+      coverImage
     }
   }
 `;

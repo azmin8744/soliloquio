@@ -81,6 +81,7 @@ function WorkspaceInner() {
           isPublished: false,
           description: "",
           slug: "",
+          coverImage: "",
         };
       }
       localStorage.removeItem(RECOVERY_KEY);
@@ -96,25 +97,24 @@ function WorkspaceInner() {
   }, []);
 
   // Save handler
-  const doSave = useCallback(() => {
+  const doSave = useCallback(async () => {
     const post = activePost.value;
     if (!post || !isDirty.value) return;
     const buf = editorBuffer.value;
-    updatePost.mutate(
-      {
+    try {
+      const data = await updatePost.mutateAsync({
         id: post.id,
         title: buf.title,
         content: buf.markdownContent,
         isPublished: buf.isPublished,
         description: buf.description || undefined,
         slug: buf.slug || undefined,
-      },
-      {
-        onSuccess: (data) => {
-          if ("id" in data) markBufferClean();
-        },
-      },
-    );
+        coverImage: buf.coverImage || undefined,
+      });
+      if ("id" in data) markBufferClean();
+    } catch {
+      // error state visible via updatePost.isError
+    }
   }, []);
 
   // Auto-save
@@ -167,6 +167,7 @@ function WorkspaceInner() {
           isPublished: false,
           description: "",
           slug: "",
+          coverImage: "",
         };
         lastSavedBuffer.value = {
           title: "",
@@ -174,6 +175,7 @@ function WorkspaceInner() {
           isPublished: false,
           description: "",
           slug: "",
+          coverImage: "",
         };
       },
     });
@@ -250,6 +252,7 @@ function WorkspaceInner() {
             activeTab={metaPaneTab.value}
             buffer={editorBuffer.value}
             onBufferChange={handleBufferChange}
+            onSwitchToImages={() => handleToggleMetaTab("images")}
           />
         )}
       </div>
