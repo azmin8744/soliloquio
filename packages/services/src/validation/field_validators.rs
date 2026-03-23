@@ -40,6 +40,12 @@ impl FieldValidator {
         }
     }
 
+    pub fn validate_max_length(value: &str, field_name: &str, max: usize, errors: &mut ValidationErrors) {
+        if value.len() > max {
+            errors.add_error(field_name, format!("{field_name} must be {max} characters or fewer"));
+        }
+    }
+
     pub fn validate_passwords_different(current: &str, new: &str, errors: &mut ValidationErrors) {
         // Simple check for now - in practice you'd compare against the hash
         if current == new {

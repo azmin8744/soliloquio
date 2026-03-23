@@ -14,6 +14,7 @@ impl InputValidator for SignUpInput {
     fn validate(&self) -> Result<(), ValidationErrors> {
         let mut errors = ValidationErrors::new();
 
+        FieldValidator::validate_max_length(&self.email, "email", 254, &mut errors);
         FieldValidator::validate_email(&self.email, &mut errors);
         FieldValidator::validate_password_field(&self.password, "password", &mut errors);
 
@@ -86,7 +87,14 @@ pub struct UpdateUserInput {
 impl InputValidator for UpdateUserInput {
     fn validate(&self) -> Result<(), ValidationErrors> {
         let mut errors = ValidationErrors::new();
+        FieldValidator::validate_max_length(&self.email, "email", 254, &mut errors);
         FieldValidator::validate_email(&self.email, &mut errors);
+        if let Some(ref v) = self.display_name {
+            FieldValidator::validate_max_length(v, "display_name", 100, &mut errors);
+        }
+        if let Some(ref v) = self.bio {
+            FieldValidator::validate_max_length(v, "bio", 1000, &mut errors);
+        }
         if errors.is_empty() {
             Ok(())
         } else {

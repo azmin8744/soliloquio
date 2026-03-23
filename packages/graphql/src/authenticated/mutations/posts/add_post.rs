@@ -24,7 +24,26 @@ pub(super) async fn add_post(
         }));
     }
 
+    if new_post.title.len() > 500 {
+        return Err(async_graphql::Error::new("title must be 500 characters or fewer"));
+    }
+    if new_post.content.len() > 200_000 {
+        return Err(async_graphql::Error::new("content must be 200000 characters or fewer"));
+    }
+    if let Some(ref v) = new_post.description {
+        if v.len() > 500 {
+            return Err(async_graphql::Error::new("description must be 500 characters or fewer"));
+        }
+    }
+    if let Some(ref v) = new_post.slug {
+        if v.len() > 200 {
+            return Err(async_graphql::Error::new("slug must be 200 characters or fewer"));
+        }
+    }
     if let Some(ref url) = new_post.cover_image {
+        if url.len() > 2000 {
+            return Err(async_graphql::Error::new("cover_image must be 2000 characters or fewer"));
+        }
         Url::parse(url).map_err(|_| async_graphql::Error::new("cover_image must be a valid URL"))?;
     }
 
