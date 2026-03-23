@@ -74,8 +74,15 @@ pub async fn upload(
 
         let original_filename = content_disposition
             .and_then(|cd| cd.get_filename())
-            .unwrap_or("upload")
-            .to_string();
+            .map(|f| {
+                let name = f.replace('\0', "");
+                let name = std::path::Path::new(&name)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("upload");
+                name.chars().take(255).collect::<String>()
+            })
+            .unwrap_or_else(|| "upload".to_string());
 
         const MAX_BYTES: usize = 10 * 1024 * 1024; // 10 MiB
         let mut bytes = Vec::new();
