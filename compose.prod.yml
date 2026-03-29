@@ -18,6 +18,8 @@ services:
     depends_on:
       database:
         condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
     environment:
       DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@database:5432/${DB_NAME:-soliloquio}
       TOKEN_SECRET: ${TOKEN_SECRET}
