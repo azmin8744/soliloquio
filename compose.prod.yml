@@ -44,7 +44,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-3000}:8000"
     environment:
-      GRAPHQL_ENDPOINT: http://backend:8000/graphql
+      GRAPHQL_ENDPOINT: http://backend:8000/
     depends_on:
       - backend
 
