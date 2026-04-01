@@ -80,8 +80,14 @@ impl EmailService {
     }
 
     fn build_transport(&self) -> AsyncSmtpTransport<Tokio1Executor> {
-        let mut builder = AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&self.smtp_host)
-            .port(self.smtp_port);
+        let mut builder = match self.smtp_port {
+            465 => AsyncSmtpTransport::<Tokio1Executor>::relay(&self.smtp_host)
+                .expect("failed to build TLS transport"),
+            587 => AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&self.smtp_host)
+                .expect("failed to build STARTTLS transport"),
+            _ => AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&self.smtp_host)
+                .port(self.smtp_port),
+        };
         if let (Some(user), Some(pass)) = (&self.smtp_user, &self.smtp_password) {
             builder = builder.credentials(Credentials::new(user.clone(), pass.clone()));
         }
