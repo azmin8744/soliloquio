@@ -21,7 +21,7 @@ services:
     volumes:
       - ./uploads:/app/uploads
     environment:
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@database:5432/${DB_NAME:-soliloquio}
+      DATABASE_URL: ${DATABASE_URL}
       TOKEN_SECRET: ${TOKEN_SECRET}
       TOKEN_EXPIRATION_SECONDS: ${TOKEN_EXPIRATION_SECONDS:-3600}
       REFRESH_TOKEN_EXPIRATION_DAYS: ${REFRESH_TOKEN_EXPIRATION_DAYS:-7}
