@@ -65,6 +65,7 @@ impl EmailService {
             .to(to
                 .parse()
                 .map_err(|e| format!("invalid to address: {e}"))?)
+            .message_id(None)
             .subject(subject)
             .header(ContentType::TEXT_HTML)
             .body(html_body.to_string())
