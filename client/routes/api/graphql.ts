@@ -16,17 +16,34 @@ function getRefreshToken(cookieHeader: string | null): string | null {
   return match ? match[1] : null;
 }
 
-// Check if response is auth error
+const AUTH_ERROR_STRINGS = ["Token not found", "Token expired", "Invalid token"];
+
+function isAuthMessage(msg: unknown): boolean {
+  return typeof msg === "string" && AUTH_ERROR_STRINGS.some((s) => msg.includes(s));
+}
+
+// Check if response is auth error (top-level errors or mutation AuthError payloads)
 function isAuthError(json: unknown): boolean {
   if (!json || typeof json !== "object") return false;
-  const data = json as Record<string, unknown>;
-  if (!data.errors) return false;
-  const errors = data.errors as Array<{ message?: string }>;
-  return errors.some((e) =>
-    e.message?.includes("Token not found") ||
-    e.message?.includes("Token expired") ||
-    e.message?.includes("Invalid token")
-  );
+  const root = json as Record<string, unknown>;
+
+  // Top-level GraphQL errors
+  if (Array.isArray(root.errors)) {
+    if ((root.errors as Array<{ message?: unknown }>).some((e) => isAuthMessage(e.message))) {
+      return true;
+    }
+  }
+
+  // Mutation/query payload AuthError union variants: data.*.message
+  if (root.data && typeof root.data === "object") {
+    for (const value of Object.values(root.data as Record<string, unknown>)) {
+      if (value && typeof value === "object") {
+        if (isAuthMessage((value as Record<string, unknown>).message)) return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 export const handler: Handlers = {
