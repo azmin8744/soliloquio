@@ -76,23 +76,32 @@ impl PostDao {
         Entity::delete(model).exec(db).await
     }
 
+    pub async fn count_published(
+        db: &DatabaseConnection,
+        user_id: Uuid,
+    ) -> Result<u64, DbErr> {
+        Posts::find()
+            .filter(Column::UserId.eq(user_id))
+            .filter(Column::IsPublished.eq(true))
+            .count(db)
+            .await
+    }
+
     pub async fn find_paginated_published(
         db: &DatabaseConnection,
         user_id: Uuid,
         sort_col: Column,
         order: Order,
-        filter: Option<Condition>,
         limit: u64,
+        offset: u64,
     ) -> Result<Vec<Model>, DbErr> {
-        let mut q = Posts::find()
+        Posts::find()
             .filter(Column::UserId.eq(user_id))
-            .filter(Column::IsPublished.eq(true));
-        if let Some(cond) = filter {
-            q = q.filter(cond);
-        }
-        q.order_by(sort_col, order.clone())
+            .filter(Column::IsPublished.eq(true))
+            .order_by(sort_col, order.clone())
             .order_by(Column::Id, order)
             .limit(limit)
+            .offset(offset)
             .all(db)
             .await
     }

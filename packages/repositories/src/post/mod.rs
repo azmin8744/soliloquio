@@ -129,9 +129,11 @@ fn build_keyset_filter(
 #[derive(Debug)]
 pub struct PaginatedPosts {
     pub posts: Vec<Model>,
-    pub cursors: Vec<String>,
+    pub cursors: Vec<String>, // used by private (admin) pagination
     pub has_previous_page: bool,
     pub has_next_page: bool,
+    pub page_number: Option<u32>,
+    pub total_pages: Option<u32>,
 }
 
 pub struct PostRepository;

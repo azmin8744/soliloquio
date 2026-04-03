@@ -1,7 +1,7 @@
 use super::types::{PublicAuthor, PublicPost};
 use crate::types::sort::SortDirection;
 use async_graphql::connection::{Connection, Edge, EmptyFields};
-use async_graphql::{Context, Enum, Object, Result};
+use async_graphql::{Context, Enum, Object, Result, SimpleObject};
 use models::{posts, users};
 use repositories::PostRepository;
 use sea_orm::entity::prelude::Uuid;
@@ -29,6 +29,12 @@ impl From<PublicPostSortBy> for repositories::PostSortBy {
             PublicPostSortBy::FirstPublishedAt => Self::FirstPublishedAt,
         }
     }
+}
+
+#[derive(SimpleObject, Default)]
+struct PostConnectionExtra {
+    page_number: Option<i32>,
+    total_pages: Option<i32>,
 }
 
 pub struct PublicApiKey(pub String);
@@ -67,12 +73,12 @@ impl PublicQueryRoot {
     async fn posts(
         &self,
         ctx: &Context<'_>,
-        after: Option<String>,
+        page: Option<i32>,
         first: Option<i32>,
         sort_by: Option<PublicPostSortBy>,
         sort_direction: Option<SortDirection>,
         search: Option<String>,
-    ) -> Result<Connection<String, PublicPost, EmptyFields, EmptyFields>> {
+    ) -> Result<Connection<String, PublicPost, PostConnectionExtra, EmptyFields>> {
         let user_id = require_user(ctx).await?;
         let db = ctx.data::<DatabaseConnection>().unwrap();
 
@@ -81,7 +87,7 @@ impl PublicQueryRoot {
             let all_posts = PostRepository::search_posts(db, user_id, q)
                 .await
                 .map_err(|e| async_graphql::Error::new(e))?;
-            let mut conn = Connection::new(false, false);
+            let mut conn = Connection::with_additional_fields(false, false, PostConnectionExtra::default());
             for post in all_posts.iter().filter(|p| p.is_published) {
                 conn.edges.push(Edge::new(post.id.to_string(), model_to_public_post(post)));
             }
@@ -94,7 +100,7 @@ impl PublicQueryRoot {
         let result = PostRepository::get_published_posts(
             db,
             user_id,
-            after.as_deref(),
+            page,
             first,
             sort_by.into(),
             sort_dir.into(),
@@ -102,9 +108,13 @@ impl PublicQueryRoot {
         .await
         .map_err(|e| async_graphql::Error::new(e))?;
 
-        let mut conn = Connection::new(result.has_previous_page, result.has_next_page);
-        for (post, cursor) in result.posts.iter().zip(result.cursors.iter()) {
-            conn.edges.push(Edge::new(cursor.clone(), model_to_public_post(post)));
+        let extra = PostConnectionExtra {
+            page_number: result.page_number.map(|n| n as i32),
+            total_pages: result.total_pages.map(|n| n as i32),
+        };
+        let mut conn = Connection::with_additional_fields(result.has_previous_page, result.has_next_page, extra);
+        for post in &result.posts {
+            conn.edges.push(Edge::new(post.id.to_string(), model_to_public_post(post)));
         }
         Ok(conn)
     }

@@ -4,6 +4,7 @@ input AddPostInput {
 	isPublished: Boolean
 	description: String
 	slug: String
+	coverImage: String
 }
 
 type ApiKeyInfo {
@@ -179,6 +180,7 @@ type Post {
 	updatedAt: NaiveDateTime!
 	description: String
 	slug: String
+	coverImage: String
 	"""
 	Returns the original markdown content for editing
 	"""
@@ -298,6 +300,7 @@ input UpdatePostInput {
 	isPublished: Boolean
 	description: String
 	slug: String
+	coverImage: String
 }
 
 input UpdateUserInput {
