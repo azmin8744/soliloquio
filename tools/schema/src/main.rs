@@ -1,8 +1,8 @@
 use async_graphql::*;
-use graphql::mutations::Mutations as MutationRoot;
+use graphql::authenticated::mutations::Mutations as MutationRoot;
+use graphql::authenticated::queries::Queries as QueryRoot;
+use graphql::authenticated::subscriptions::Subscriptions as SubscriptionRoot;
 use graphql::public::PublicQueryRoot;
-use graphql::queries::Queries as QueryRoot;
-use graphql::subscriptions::Subscriptions as SubscriptionRoot;
 use std::fs;
 
 fn main() -> std::io::Result<()> {
