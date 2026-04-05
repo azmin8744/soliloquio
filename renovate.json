@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": ["config:recommended", "github>Omochice/renovate-config:deno"],
   "timezone": "UTC",
   "schedule": ["on the first day of the month"],
   "enabledManagers": ["cargo", "dockerfile", "docker-compose"],
@@ -23,40 +23,6 @@
     {
       "matchDepNames": ["sj26/mailcatcher"],
       "enabled": false
-    }
-  ],
-  "customManagers": [
-    {
-      "description": "deno.land/x and std in deno.json",
-      "customType": "regex",
-      "managerFilePatterns": ["(^|/)deno\\.json$"],
-      "matchStrings": [
-        "https://deno\\.land/(?:x/)?(?<depName>[^@/\"]+)@(?<currentValue>[^/\"\\s]+)"
-      ],
-      "datasourceTemplate": "deno",
-      "versioningTemplate": "semver"
-    },
-    {
-      "description": "esm.sh packages in deno.json",
-      "customType": "regex",
-      "managerFilePatterns": ["(^|/)deno\\.json$"],
-      "matchStrings": [
-        "https://esm\\.sh/\\*?(?<depName>@[^/@\"]+/[^@/\"]+)@(?<currentValue>[0-9][^?/\"\\s]*)",
-        "https://esm\\.sh/(?<depName>[a-z][a-z0-9._-]*)@(?<currentValue>[0-9][^?/\"\\s]*)"
-      ],
-      "datasourceTemplate": "npm",
-      "versioningTemplate": "npm"
-    },
-    {
-      "description": "npm: specifiers in deno.json",
-      "customType": "regex",
-      "managerFilePatterns": ["(^|/)deno\\.json$"],
-      "matchStrings": [
-        "npm:/?(?<depName>@[^/@\"\\s]+/[^@\"\\s/]+)@(?<currentValue>[0-9][^\"\\s/]*)",
-        "npm:/?(?<depName>[a-z][a-z0-9._-]*)@(?<currentValue>[0-9][^\"\\s/]*)"
-      ],
-      "datasourceTemplate": "npm",
-      "versioningTemplate": "npm"
     }
   ]
 }
