@@ -6,11 +6,14 @@
   "enabledManagers": ["cargo", "dockerfile", "docker-compose"],
   "vulnerabilityAlerts": {
     "schedule": ["at any time"],
-    "prPriority": 10,
     "labels": ["security"],
     "automerge": true
   },
   "packageRules": [
+    {
+      "matchIsVulnerabilityAlert": true,
+      "prPriority": 10
+    },
     {
       "matchUpdateTypes": ["patch", "minor"],
       "groupName": "non-major updates",
