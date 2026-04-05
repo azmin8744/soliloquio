@@ -27,27 +27,23 @@
   ],
   "customManagers": [
     {
-      "description": "deno.land/x packages in deno.json",
+      "description": "deno.land/x and std in deno.json",
       "customType": "regex",
       "fileMatch": ["(^|/)deno\\.json$"],
-      "matchStrings": ["https://deno\\.land/x/(?<depName>[^@]+)@(?<currentValue>[^/\"\\s]+)"],
+      "matchStrings": [
+        "https://deno\\.land/(?:x/)?(?<depName>[^@/\"]+)@(?<currentValue>[^/\"\\s]+)"
+      ],
       "datasourceTemplate": "deno",
       "versioningTemplate": "semver"
     },
     {
-      "description": "deno.land/std in deno.json",
+      "description": "esm.sh packages in deno.json",
       "customType": "regex",
       "fileMatch": ["(^|/)deno\\.json$"],
-      "matchStrings": ["https://deno\\.land/std@(?<currentValue>[^/\"\\s]+)"],
-      "depNameTemplate": "deno.land/std",
-      "datasourceTemplate": "deno",
-      "versioningTemplate": "semver"
-    },
-    {
-      "description": "esm.sh packages in deno.json (bare, scoped, and * prefix)",
-      "customType": "regex",
-      "fileMatch": ["(^|/)deno\\.json$"],
-      "matchStrings": ["https://esm\\.sh/\\*?(?<depName>@[^/@]+/[^@]+|[^@/*][^@]*)@(?<currentValue>[0-9][^?/\"\\s]*)"],
+      "matchStrings": [
+        "https://esm\\.sh/\\*?(?<depName>@[^/@\"]+/[^@/\"]+)@(?<currentValue>[0-9][^?/\"\\s]*)",
+        "https://esm\\.sh/(?<depName>[a-z][a-z0-9._-]*)@(?<currentValue>[0-9][^?/\"\\s]*)"
+      ],
       "datasourceTemplate": "npm",
       "versioningTemplate": "npm"
     },
@@ -55,7 +51,10 @@
       "description": "npm: specifiers in deno.json",
       "customType": "regex",
       "fileMatch": ["(^|/)deno\\.json$"],
-      "matchStrings": ["npm:/?(?<depName>@[^/@]+/[^@\"\\s]+|[^@/\"\\s][^@\"\\s]*)@(?<currentValue>[0-9][^\"\\s/]*)"],
+      "matchStrings": [
+        "npm:/?(?<depName>@[^/@\"\\s]+/[^@\"\\s/]+)@(?<currentValue>[0-9][^\"\\s/]*)",
+        "npm:/?(?<depName>[a-z][a-z0-9._-]*)@(?<currentValue>[0-9][^\"\\s/]*)"
+      ],
       "datasourceTemplate": "npm",
       "versioningTemplate": "npm"
     }
