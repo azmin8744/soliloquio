@@ -11,10 +11,6 @@
   },
   "packageRules": [
     {
-      "matchIsVulnerabilityAlert": true,
-      "prPriority": 10
-    },
-    {
       "matchUpdateTypes": ["patch", "minor"],
       "groupName": "non-major updates",
       "schedule": ["on the first day of the month"]
