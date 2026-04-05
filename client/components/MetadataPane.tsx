@@ -27,7 +27,9 @@ interface ImageTileProps {
   onClearCover: () => void;
 }
 
-function ImageTile({ asset, isCover, onSetCover, onClearCover }: ImageTileProps) {
+function ImageTile(
+  { asset, isCover, onSetCover, onClearCover }: ImageTileProps,
+) {
   const [showSizes, setShowSizes] = useState(false);
 
   const handleInsert = (sizeKey: SizeKey) => {
@@ -72,7 +74,8 @@ function ImageTile({ asset, isCover, onSetCover, onClearCover }: ImageTileProps)
           : (
             <button
               type="button"
-              onClick={() => onSetCover(`${globalThis.location.origin}${asset.urls.large}`)}
+              onClick={() =>
+                onSetCover(`${globalThis.location.origin}${asset.urls.large}`)}
               class="px-2 py-1 text-xs font-medium text-white bg-emerald-600 rounded hover:bg-emerald-700"
             >
               Set cover
@@ -178,7 +181,10 @@ function MetaTab(
 }
 
 function ImagesTab(
-  { buffer, onBufferChange }: Pick<MetadataPaneProps, "buffer" | "onBufferChange">,
+  { buffer, onBufferChange }: Pick<
+    MetadataPaneProps,
+    "buffer" | "onBufferChange"
+  >,
 ) {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useAssets();
   const upload = useUploadAsset();
@@ -209,7 +215,9 @@ function ImagesTab(
             <ImageTile
               key={asset.id}
               asset={asset}
-              isCover={!!buffer.coverImage && buffer.coverImage === `${globalThis.location.origin}${asset.urls.large}`}
+              isCover={!!buffer.coverImage &&
+                buffer.coverImage ===
+                  `${globalThis.location.origin}${asset.urls.large}`}
               onSetCover={(url) => onBufferChange({ coverImage: url })}
               onClearCover={() => onBufferChange({ coverImage: "" })}
             />
