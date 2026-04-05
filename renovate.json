@@ -4,6 +4,9 @@
   "timezone": "UTC",
   "schedule": ["on the first day of the month"],
   "enabledManagers": ["cargo", "dockerfile", "docker-compose"],
+  "cargo": {
+    "managerFilePatterns": ["^Cargo\\.toml$"]
+  },
   "vulnerabilityAlerts": {
     "schedule": ["at any time"],
     "labels": ["security"],
