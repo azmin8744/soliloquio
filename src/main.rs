@@ -3,6 +3,8 @@ use actix_web::{guard, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use async_graphql::{http::GraphiQLSource, Schema};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 use tracing_actix_web::TracingLogger;
+use request_id::RequestIdSpanBuilder;
+mod request_id;
 mod setup;
 mod upload;
 use graphql::config::SingleUserMode;
@@ -203,7 +205,7 @@ async fn main() -> std::io::Result<()> {
         };
 
         App::new()
-            .wrap(TracingLogger::default())
+            .wrap(TracingLogger::<RequestIdSpanBuilder>::new())
             .app_data(web::Data::new(schema.clone()))
             .app_data(web::Data::new(public_schema.clone()))
             .app_data(web::Data::new(db.clone()))
