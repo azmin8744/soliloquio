@@ -1,6 +1,6 @@
 services:
   database:
-    image: paradedb/paradedb:latest
+    image: paradedb/paradedb:0.22.5
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

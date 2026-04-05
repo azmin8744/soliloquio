@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   database:
-    image: paradedb/paradedb:latest
+    image: paradedb/paradedb:0.22.5
     restart: always
     ports:
       - 5432:5432

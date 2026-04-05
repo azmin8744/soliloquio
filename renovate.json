@@ -1,0 +1,56 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "UTC",
+  "schedule": ["on the first day of the month"],
+  "enabledManagers": ["cargo", "deno", "dockerfile", "docker-compose"],
+  "vulnerabilityAlerts": {
+    "schedule": ["at any time"],
+    "prPriority": 10,
+    "labels": ["security"],
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["patch", "minor"],
+      "groupName": "non-major updates",
+      "schedule": ["on the first day of the month"]
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "schedule": ["on the first day of the month"],
+      "labels": ["major-update"]
+    },
+    {
+      "matchDepNames": ["sj26/mailcatcher"],
+      "enabled": false
+    }
+  ],
+  "deno": {
+    "fileMatch": ["(^|/)deno\\.json$"]
+  },
+  "customManagers": [
+    {
+      "description": "esm.sh URLs with query params — enable if native deno manager misses them",
+      "enabled": false,
+      "customType": "regex",
+      "fileMatch": ["(^|/)deno\\.json$"],
+      "matchStrings": [
+        "\"https://esm\\.sh/(?<depName>[^@*\"][^@\"]+)@(?<currentValue>[0-9][^?\"\\s]+)[?][^\"\n]+"
+      ],
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    },
+    {
+      "description": "esm.sh * prefix (bundled deps) — enable if native deno manager misses them",
+      "enabled": false,
+      "customType": "regex",
+      "fileMatch": ["(^|/)deno\\.json$"],
+      "matchStrings": [
+        "\"https://esm\\.sh/\\*(?<depName>@[^@\"]+)@(?<currentValue>[0-9][^\"\\s?]+)"
+      ],
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    }
+  ]
+}
