@@ -1,4 +1,5 @@
 import { Handlers } from "$fresh/server.ts";
+import { logger } from "@/utils/logger.ts";
 
 const REFRESH_MUTATION = `
   mutation RefreshAccessToken($refreshToken: String!) {
@@ -16,10 +17,19 @@ function getRefreshToken(cookieHeader: string | null): string | null {
   return match ? match[1] : null;
 }
 
-const AUTH_ERROR_STRINGS = ["Token not found", "Token expired", "Invalid token"];
+function getClientIp(req: Request): string | null {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+}
+
+const AUTH_ERROR_STRINGS = [
+  "Token not found",
+  "Token expired",
+  "Invalid token",
+];
 
 function isAuthMessage(msg: unknown): boolean {
-  return typeof msg === "string" && AUTH_ERROR_STRINGS.some((s) => msg.includes(s));
+  return typeof msg === "string" &&
+    AUTH_ERROR_STRINGS.some((s) => msg.includes(s));
 }
 
 // Check if response is auth error (top-level errors or mutation AuthError payloads)
@@ -29,7 +39,11 @@ function isAuthError(json: unknown): boolean {
 
   // Top-level GraphQL errors
   if (Array.isArray(root.errors)) {
-    if ((root.errors as Array<{ message?: unknown }>).some((e) => isAuthMessage(e.message))) {
+    if (
+      (root.errors as Array<{ message?: unknown }>).some((e) =>
+        isAuthMessage(e.message)
+      )
+    ) {
       return true;
     }
   }
@@ -38,7 +52,9 @@ function isAuthError(json: unknown): boolean {
   if (root.data && typeof root.data === "object") {
     for (const value of Object.values(root.data as Record<string, unknown>)) {
       if (value && typeof value === "object") {
-        if (isAuthMessage((value as Record<string, unknown>).message)) return true;
+        if (isAuthMessage((value as Record<string, unknown>).message)) {
+          return true;
+        }
       }
     }
   }
@@ -51,9 +67,14 @@ export const handler: Handlers = {
     const endpoint = Deno.env.get("GRAPHQL_ENDPOINT") ||
       "http://localhost:8000/graphql";
 
+    const requestId = crypto.randomUUID();
+    const ip = getClientIp(req);
+    const path = new URL(req.url).pathname;
+
     const cookieHeader = req.headers.get("Cookie");
     const headers: HeadersInit = {
       "Content-Type": "application/json",
+      "X-Request-ID": requestId,
     };
 
     // Forward cookies to backend
@@ -81,14 +102,26 @@ export const handler: Handlers = {
       const json = await clonedResponse.json();
 
       if (isAuthError(json)) {
+        logger.warn("auth.token_invalid", {
+          request_id: requestId,
+          who: { ip },
+          where: { path, method: "POST" },
+        });
+
         const refreshToken = getRefreshToken(cookieHeader);
         if (refreshToken) {
+          logger.info("auth.refresh_attempt", {
+            request_id: requestId,
+            who: { ip },
+          });
+
           // Attempt refresh
           const refreshResponse = await fetch(endpoint, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "Cookie": cookieHeader || "",
+              "X-Request-ID": requestId,
             },
             body: JSON.stringify({
               query: REFRESH_MUTATION,
@@ -101,6 +134,12 @@ export const handler: Handlers = {
             const refreshData = refreshJson?.data?.refreshAccessToken;
 
             if (refreshData?.token) {
+              logger.info("auth.refresh_success", {
+                request_id: requestId,
+                who: { ip },
+                what: { outcome: "success" },
+              });
+
               // Refresh succeeded - collect Set-Cookie headers, retry original request
               const setCookieHeaders: string[] = [];
               refreshResponse.headers.forEach((value, key) => {
@@ -118,6 +157,7 @@ export const handler: Handlers = {
                 headers: {
                   "Content-Type": "application/json",
                   "Cookie": newCookieHeader,
+                  "X-Request-ID": requestId,
                 },
                 body,
               });
@@ -136,6 +176,18 @@ export const handler: Handlers = {
               });
             }
           }
+
+          logger.warn("auth.refresh_failed", {
+            request_id: requestId,
+            who: { ip },
+            what: { outcome: "failure" },
+          });
+
+          logger.warn("auth.session_expired", {
+            request_id: requestId,
+            who: { ip },
+            where: { path, method: "POST", status: 401 },
+          });
 
           // Refresh failed - return 401 to client
           return new Response(

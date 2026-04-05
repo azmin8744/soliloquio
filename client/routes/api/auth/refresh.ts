@@ -1,4 +1,5 @@
 import { Handlers } from "$fresh/server.ts";
+import { logger } from "@/utils/logger.ts";
 
 const REFRESH_MUTATION = `
   mutation RefreshAccessToken($refreshToken: String!) {
@@ -21,6 +22,8 @@ export const handler: Handlers = {
     const endpoint = Deno.env.get("GRAPHQL_ENDPOINT") ||
       "http://localhost:8000/graphql";
 
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      null;
     const cookieHeader = req.headers.get("Cookie");
     const refreshToken = getRefreshToken(cookieHeader);
 
@@ -33,6 +36,8 @@ export const handler: Handlers = {
         },
       );
     }
+
+    logger.info("auth.refresh_attempt", { who: { ip } });
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -47,6 +52,10 @@ export const handler: Handlers = {
     });
 
     if (!response.ok) {
+      logger.warn("auth.refresh_failed", {
+        who: { ip },
+        what: { outcome: "failure", reason: "backend_error" },
+      });
       return new Response(
         JSON.stringify({ success: false, error: "Refresh failed" }),
         {
@@ -68,11 +77,20 @@ export const handler: Handlers = {
     const refreshData = json?.data?.refreshAccessToken;
 
     if (refreshData?.token) {
+      logger.info("auth.refresh_success", {
+        who: { ip },
+        what: { outcome: "success" },
+      });
       return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: responseHeaders,
       });
     }
+
+    logger.warn("auth.refresh_failed", {
+      who: { ip },
+      what: { outcome: "failure", reason: refreshData?.message ?? "unknown" },
+    });
 
     return new Response(
       JSON.stringify({

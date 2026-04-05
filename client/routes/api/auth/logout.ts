@@ -1,4 +1,5 @@
 import { Handlers } from "$fresh/server.ts";
+import { logger } from "@/utils/logger.ts";
 
 const LOGOUT_MUTATION = `
   mutation Logout($refreshToken: String!) {
@@ -18,6 +19,8 @@ export const handler: Handlers = {
     const endpoint = Deno.env.get("GRAPHQL_ENDPOINT") ||
       "http://localhost:8000/graphql";
 
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      null;
     const cookieHeader = req.headers.get("Cookie");
     const refreshToken = getRefreshToken(cookieHeader);
 
@@ -35,6 +38,8 @@ export const handler: Handlers = {
         }),
       });
     }
+
+    logger.info("auth.logout", { who: { ip } });
 
     // Clear cookies by setting expired ones
     const headers = new Headers({ "Content-Type": "application/json" });
