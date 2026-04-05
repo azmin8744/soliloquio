@@ -26,28 +26,11 @@ class SimpleGraphQLClient {
     });
 
     if (!response.ok) {
-      if (response.status === 401) {
-        // Save editor buffer to localStorage before redirect
-        if (typeof globalThis !== "undefined" && globalThis.location) {
-          try {
-            const { activePostId, editorBuffer, isDirty } = await import(
-              "./workspace_signals.ts"
-            );
-            if (isDirty.value && activePostId.value) {
-              localStorage.setItem(
-                "soliloquio_editor_recovery",
-                JSON.stringify({
-                  postId: activePostId.value,
-                  buffer: editorBuffer.value,
-                }),
-              );
-            }
-          } catch { /* signals may not be loaded */ }
-          globalThis.location.href = "/auth/signin";
-        }
-        throw new Error("Session expired");
-      }
-      throw new Error(`GraphQL request failed: ${response.statusText}`);
+      throw new Error(
+        response.status === 401
+          ? "Session expired"
+          : `GraphQL request failed: ${response.statusText}`,
+      );
     }
 
     const json = await response.json();

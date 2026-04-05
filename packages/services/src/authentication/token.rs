@@ -18,9 +18,12 @@ pub struct AuthError {
 
 impl From<jsonwebtoken::errors::Error> for AuthError {
     fn from(e: jsonwebtoken::errors::Error) -> Self {
-        AuthError {
-            message: e.to_string(),
-        }
+        use jsonwebtoken::errors::ErrorKind;
+        let message = match e.kind() {
+            ErrorKind::ExpiredSignature => "Token expired".to_string(),
+            _ => "Invalid token".to_string(),
+        };
+        AuthError { message }
     }
 }
 

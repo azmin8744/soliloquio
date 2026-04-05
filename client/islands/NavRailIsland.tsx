@@ -14,7 +14,22 @@ function NavRailIslandInner({ activePage }: NavRailIslandProps) {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      globalThis.location.href = "/auth/signin";
+      // Save unsaved editor work before redirecting
+      import("../utils/workspace_signals.ts").then(
+        ({ activePostId, editorBuffer, isDirty }) => {
+          if (isDirty.value && activePostId.value) {
+            localStorage.setItem(
+              "soliloquio_editor_recovery",
+              JSON.stringify({
+                postId: activePostId.value,
+                buffer: editorBuffer.value,
+              }),
+            );
+          }
+        },
+      ).catch(() => {}).finally(() => {
+        globalThis.location.href = "/auth/signin";
+      });
     }
   }, [isLoading, user]);
 

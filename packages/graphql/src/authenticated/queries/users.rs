@@ -14,19 +14,17 @@ impl RequiresAuth for UserQueries {}
 #[Object]
 impl UserQueries {
     /// Get the currently authenticated user's profile
-    async fn me(&self, ctx: &Context<'_>) -> Result<Option<UserType>, AuthError> {
-        match self.require_authenticate_as_user(ctx).await {
-            Ok(user) => Ok(Some(UserType {
-                id: user.id,
-                email: user.email,
-                email_verified_at: user.email_verified_at,
-                display_name: user.display_name,
-                bio: user.bio,
-                created_at: user.created_at,
-                updated_at: user.updated_at,
-            })),
-            Err(_) => Ok(None),
-        }
+    async fn me(&self, ctx: &Context<'_>) -> Result<UserType, AuthError> {
+        let user = self.require_authenticate_as_user(ctx).await?;
+        Ok(UserType {
+            id: user.id,
+            email: user.email,
+            email_verified_at: user.email_verified_at,
+            display_name: user.display_name,
+            bio: user.bio,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
+        })
     }
 
     async fn api_keys(&self, ctx: &Context<'_>) -> Result<Vec<ApiKeyInfo>, AuthError> {
@@ -76,17 +74,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_me_unauthenticated_returns_none() {
+    async fn test_me_unauthenticated_returns_error() {
         let db = setup_test_db().await;
         let schema = create_test_schema(db.clone());
 
         let query = r#"query { me { id } }"#;
 
         let res = schema.execute(Request::new(query)).await;
-        assert!(res.errors.is_empty());
-
-        let data = res.data.into_json().unwrap();
-        assert!(data["me"].is_null());
+        assert!(!res.errors.is_empty());
     }
 
     #[tokio::test]
