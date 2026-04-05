@@ -60,6 +60,8 @@ impl RefreshAccessTokenMutation {
 
         let _ = cleanup_expired_tokens(db).await;
 
+        tracing::info!(user_id = %user.id, "auth.refresh_success");
+
         Ok(RefreshAccessTokenResult::AuthorizedUser(AuthorizedUser {
             token: new_access_token,
             refresh_token,

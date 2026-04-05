@@ -28,7 +28,7 @@ pub trait RequiresAuth {
         let token = match ctx.data::<Token>() {
             Ok(token) => token,
             Err(_) => {
-                tracing::debug!("missing auth token");
+                tracing::warn!("auth.token_missing");
                 return Err(AuthenticationError {
                     message: "Token not found".to_string(),
                 });

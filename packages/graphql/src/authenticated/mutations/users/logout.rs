@@ -18,7 +18,7 @@ impl LogoutMutation {
 
         clear_auth_cookies(ctx);
 
-        tracing::info!("logout");
+        tracing::info!("auth.logout");
 
         let _ = cleanup_expired_tokens(db).await;
 
