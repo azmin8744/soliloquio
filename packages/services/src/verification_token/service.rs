@@ -26,7 +26,7 @@ impl From<DbErr> for TokenError {
 fn hash_token(raw: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(raw.as_bytes());
-    format!("{:x}", hasher.finalize())
+    hasher.finalize().iter().fold(String::new(), |mut s, b| { use std::fmt::Write; write!(s, "{:02x}", b).unwrap(); s })
 }
 
 pub async fn create_token(
