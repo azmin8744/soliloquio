@@ -6,7 +6,7 @@ use uuid::Uuid;
 fn hash_key(raw: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(raw.as_bytes());
-    format!("{:x}", hasher.finalize())
+    hasher.finalize().iter().fold(String::new(), |mut s, b| { use std::fmt::Write; write!(s, "{:02x}", b).unwrap(); s })
 }
 
 /// Returns `(raw_key, key_hash)`. Raw key shown once to user.
