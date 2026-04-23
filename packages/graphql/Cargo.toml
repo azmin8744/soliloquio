@@ -28,4 +28,4 @@ repositories = { path = "../repositories" }
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 dotenvy = "0.15"
-jsonwebtoken = "10.0.0"
+jsonwebtoken = { version = "10.0.0", features = ["use_pem", "rust_crypto"] }
