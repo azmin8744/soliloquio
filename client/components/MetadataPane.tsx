@@ -9,6 +9,8 @@ interface MetadataPaneProps {
   buffer: EditorBuffer;
   onBufferChange: (partial: Partial<EditorBuffer>) => void;
   onSwitchToImages: () => void;
+  onBack?: () => void;
+  class?: string;
 }
 
 type SizeKey = keyof AssetUrls;
@@ -242,10 +244,32 @@ function ImagesTab(
 }
 
 export function MetadataPane(
-  { activeTab, buffer, onBufferChange, onSwitchToImages }: MetadataPaneProps,
+  {
+    activeTab,
+    buffer,
+    onBufferChange,
+    onSwitchToImages,
+    onBack,
+    class: extraClass,
+  }: MetadataPaneProps,
 ) {
   return (
-    <div class="w-72 border-l border-gray-200 bg-white flex flex-col overflow-y-auto">
+    <div
+      class={`w-full md:w-72 border-l border-gray-200 bg-white flex flex-col overflow-y-auto ${
+        extraClass ?? ""
+      }`}
+    >
+      {onBack && (
+        <div class="md:hidden flex items-center px-3 py-2 border-b border-gray-200 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onBack}
+            class="text-sm text-gray-500 hover:text-gray-700"
+          >
+            ← Editor
+          </button>
+        </div>
+      )}
       {activeTab === "meta"
         ? (
           <MetaTab

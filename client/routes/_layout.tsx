@@ -10,7 +10,9 @@ export default function AppLayout({ Component, url }: LayoutProps) {
   return (
     <div class="h-screen flex bg-gray-50">
       <NavRailIsland activePage={activePage} />
-      <Component />
+      <div class="flex-1 min-h-0 flex flex-col overflow-hidden pb-14 md:pb-0">
+        <Component />
+      </div>
     </div>
   );
 }

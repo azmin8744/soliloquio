@@ -18,6 +18,9 @@ interface EditorPaneProps {
   isMetaPaneOpen: boolean;
   activeMetaTab: MetaPaneTab;
   onToggleMetaTab: (tab: MetaPaneTab) => void;
+  onBack?: () => void;
+  onNavigateToMeta?: (tab: MetaPaneTab) => void;
+  class?: string;
 }
 
 export function EditorPane({
@@ -35,6 +38,9 @@ export function EditorPane({
   isMetaPaneOpen,
   activeMetaTab,
   onToggleMetaTab,
+  onBack,
+  onNavigateToMeta,
+  class: extraClass,
 }: EditorPaneProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -62,8 +68,21 @@ export function EditorPane({
 
   if (!activePost) {
     return (
-      <div class="flex-1 flex items-center justify-center text-gray-400">
-        <p>Select a post or create a new one</p>
+      <div class={`flex-1 flex flex-col min-w-0 ${extraClass ?? ""}`}>
+        {onBack && (
+          <div class="flex items-center px-4 py-2 border-b border-gray-200 bg-white md:hidden">
+            <button
+              type="button"
+              onClick={onBack}
+              class="text-sm text-gray-500 hover:text-gray-700"
+            >
+              ← Posts
+            </button>
+          </div>
+        )}
+        <div class="flex-1 flex items-center justify-center text-gray-400">
+          <p>Select a post or create a new one</p>
+        </div>
       </div>
     );
   }
@@ -78,9 +97,18 @@ export function EditorPane({
   const imgActive = isMetaPaneOpen && activeMetaTab === "images";
 
   return (
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class={`flex-1 flex flex-col min-w-0 ${extraClass ?? ""}`}>
       {/* Toolbar */}
       <div class="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-white">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            class="md:hidden mr-1 text-sm text-gray-500 hover:text-gray-700 flex-shrink-0"
+          >
+            ← Posts
+          </button>
+        )}
         <button
           type="button"
           onClick={onTogglePreview}
@@ -158,7 +186,10 @@ export function EditorPane({
                 <button
                   type="button"
                   title="Metadata"
-                  onClick={() => onToggleMetaTab("meta")}
+                  onClick={() => {
+                    onToggleMetaTab("meta");
+                    onNavigateToMeta?.("meta");
+                  }}
                   class={`p-1.5 rounded transition-colors ${
                     metaActive
                       ? "text-indigo-600 bg-indigo-50"
@@ -184,7 +215,10 @@ export function EditorPane({
                 <button
                   type="button"
                   title="Images"
-                  onClick={() => onToggleMetaTab("images")}
+                  onClick={() => {
+                    onToggleMetaTab("images");
+                    onNavigateToMeta?.("images");
+                  }}
                   class={`p-1.5 rounded transition-colors ${
                     imgActive
                       ? "text-indigo-600 bg-indigo-50"

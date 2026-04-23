@@ -1,0 +1,11 @@
+{
+  "name": "Soliloquio",
+  "short_name": "Soliloquio",
+  "start_url": "/posts",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#111827",
+  "icons": [
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

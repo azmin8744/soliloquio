@@ -6,7 +6,10 @@ export default function App({ Component }: PageProps) {
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>client</title>
+        <meta name="theme-color" content="#111827" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <title>Soliloquio</title>
+        <link rel="manifest" href="/manifest.json" />
         <link rel="stylesheet" href="/styles.css" />
       </head>
       <body>

@@ -39,6 +39,7 @@ interface PostTabsProps {
   search: string;
   onSearchChange: (q: string) => void;
   emailVerified: boolean;
+  class?: string;
 }
 
 export function PostTabs(
@@ -56,6 +57,7 @@ export function PostTabs(
     search,
     onSearchChange,
     emailVerified,
+    class: extraClass,
   }: PostTabsProps,
 ) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -99,7 +101,11 @@ export function PostTabs(
   }, [hasNextPage, isFetchingNextPage, onLoadMore]);
 
   return (
-    <div class="w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
+    <div
+      class={`w-full md:w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 ${
+        extraClass ?? ""
+      }`}
+    >
       {/* Header */}
       <div class="p-3 border-b border-gray-200 space-y-2">
         <button

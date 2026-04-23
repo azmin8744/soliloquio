@@ -50,6 +50,9 @@ function WorkspaceInner() {
   const deletePost = useDeletePost();
   const resendMutation = useResendVerificationEmail();
   const [recoveryToast, setRecoveryToast] = useState(false);
+  const [mobileView, setMobileView] = useState<"list" | "editor" | "meta">(
+    "list",
+  );
 
   // Sync posts query → signal
   useEffect(() => {
@@ -122,22 +125,24 @@ function WorkspaceInner() {
 
   // Post switching with dirty guard
   const handleSelectPost = useCallback((id: string) => {
-    if (id === activePostId.value) return;
-    if (isDirty.value) {
-      const choice = confirm(
-        "You have unsaved changes. Save before switching?",
-      );
-      if (choice) {
-        doSave();
+    if (id !== activePostId.value) {
+      if (isDirty.value) {
+        const choice = confirm(
+          "You have unsaved changes. Save before switching?",
+        );
+        if (choice) {
+          doSave();
+        }
+        // If they cancel, we still switch (discard). The confirm wording
+        // is "OK = save, Cancel = discard".
       }
-      // If they cancel, we still switch (discard). The confirm wording
-      // is "OK = save, Cancel = discard".
+      activePostId.value = id;
+      const post = postsSignal.value.find((p) => p.id === id);
+      if (post) loadPostIntoBuffer(post);
+      isPreviewToggled.value = false;
     }
-    activePostId.value = id;
-    const post = postsSignal.value.find((p) => p.id === id);
-    if (post) loadPostIntoBuffer(post);
-    isPreviewToggled.value = false;
-  }, [doSave]);
+    setMobileView("editor");
+  }, [doSave, setMobileView]);
 
   // New post
   const handleNewPost = useCallback(() => {
@@ -148,6 +153,7 @@ function WorkspaceInner() {
           if ("id" in data) {
             activePostId.value = data.id;
             loadPostIntoBuffer(data as import("../domains/posts.ts").Post);
+            setMobileView("editor");
           }
         },
       },
@@ -177,6 +183,7 @@ function WorkspaceInner() {
           slug: "",
           coverImage: "",
         };
+        setMobileView("list");
       },
     });
   }, []);
@@ -226,6 +233,7 @@ function WorkspaceInner() {
           search={currentSearch}
           onSearchChange={setSearch}
           emailVerified={!!user.emailVerifiedAt}
+          class={mobileView !== "list" ? "hidden md:flex" : ""}
         />
         <EditorPane
           editorBuffer={editorBuffer.value}
@@ -246,13 +254,18 @@ function WorkspaceInner() {
           isMetaPaneOpen={isMetaPaneOpen.value}
           activeMetaTab={metaPaneTab.value}
           onToggleMetaTab={handleToggleMetaTab}
+          onBack={() => setMobileView("list")}
+          onNavigateToMeta={() => setMobileView("meta")}
+          class={mobileView !== "editor" ? "hidden md:flex" : ""}
         />
-        {isMetaPaneOpen.value && (
+        {(isMetaPaneOpen.value || mobileView === "meta") && (
           <MetadataPane
             activeTab={metaPaneTab.value}
             buffer={editorBuffer.value}
             onBufferChange={handleBufferChange}
             onSwitchToImages={() => handleToggleMetaTab("images")}
+            onBack={() => setMobileView("editor")}
+            class={mobileView !== "meta" ? "hidden md:flex" : ""}
           />
         )}
       </div>

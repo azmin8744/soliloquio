@@ -114,7 +114,7 @@ export function NavRail(
   { user, isLoading, onLogout, isLoggingOut, activePage }: NavRailProps,
 ) {
   return (
-    <div class="w-16 bg-gray-900 flex flex-col items-center py-4 flex-shrink-0">
+    <div class="w-16 bg-gray-900 hidden md:flex flex-col items-center py-4 flex-shrink-0">
       <div class="flex flex-col items-center gap-1">
         <div class="text-white font-bold text-lg mb-2" title="Soliloquio">
           S
@@ -166,5 +166,48 @@ export function NavRail(
           : null}
       </div>
     </div>
+  );
+}
+
+export function BottomNav(
+  { user, isLoading, onLogout, isLoggingOut, activePage }: NavRailProps,
+) {
+  if (!isLoading && !user) return null;
+
+  const item = (active: boolean) =>
+    `flex flex-col items-center gap-0.5 px-3 py-1 transition-colors ${
+      active ? "text-white" : "text-gray-400 hover:text-gray-200"
+    }`;
+
+  return (
+    <nav class="md:hidden fixed bottom-0 inset-x-0 h-14 bg-gray-900 flex items-center justify-around z-50 border-t border-gray-800">
+      <a href="/posts" class={item(activePage === "posts")}>
+        <PostsIcon />
+        <span class="text-[10px]">Posts</span>
+      </a>
+      <a href="/assets" class={item(activePage === "assets")}>
+        <AssetsIcon />
+        <span class="text-[10px]">Assets</span>
+      </a>
+      {isLoading
+        ? <div class="w-8 h-8 bg-gray-700 rounded-full animate-pulse" />
+        : user && (
+          <>
+            <a href="/settings" class={item(activePage === "settings")}>
+              <GearIcon />
+              <span class="text-[10px]">Settings</span>
+            </a>
+            <button
+              type="button"
+              onClick={onLogout}
+              disabled={isLoggingOut}
+              class={item(false)}
+            >
+              <LogoutIcon />
+              <span class="text-[10px]">Logout</span>
+            </button>
+          </>
+        )}
+    </nav>
   );
 }
