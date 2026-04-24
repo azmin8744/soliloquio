@@ -197,6 +197,7 @@ function WorkspaceInner() {
   const handleToggleMetaTab = useCallback((tab: MetaPaneTab) => {
     if (isMetaPaneOpen.value && metaPaneTab.value === tab) {
       isMetaPaneOpen.value = false;
+      setMobileView("editor");
     } else {
       metaPaneTab.value = tab;
       isMetaPaneOpen.value = true;
@@ -264,7 +265,10 @@ function WorkspaceInner() {
             buffer={editorBuffer.value}
             onBufferChange={handleBufferChange}
             onSwitchToImages={() => handleToggleMetaTab("images")}
-            onBack={() => setMobileView("editor")}
+            onBack={() => {
+              setMobileView("editor");
+              isMetaPaneOpen.value = false;
+            }}
             class={mobileView !== "meta" ? "hidden md:flex" : ""}
           />
         )}

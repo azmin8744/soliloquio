@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import type { EditorBuffer, MetaPaneTab } from "../utils/workspace_signals.ts";
 import { pendingInsertText } from "../utils/workspace_signals.ts";
 import { useAssets, useUploadAsset } from "../services/assets/hooks.ts";
@@ -24,15 +24,21 @@ const SIZE_LABELS: { key: SizeKey; label: string }[] = [
 
 interface ImageTileProps {
   asset: Asset;
+  selected: boolean;
+  onSelect: (id: string | null) => void;
   isCover: boolean;
   onSetCover: (url: string) => void;
   onClearCover: () => void;
 }
 
 function ImageTile(
-  { asset, isCover, onSetCover, onClearCover }: ImageTileProps,
+  { asset, selected, onSelect, isCover, onSetCover, onClearCover }: ImageTileProps,
 ) {
   const [showSizes, setShowSizes] = useState(false);
+
+  useEffect(() => {
+    if (!selected) setShowSizes(false);
+  }, [selected]);
 
   const handleInsert = (sizeKey: SizeKey) => {
     const url = asset.urls[sizeKey];
@@ -42,7 +48,10 @@ function ImageTile(
   };
 
   return (
-    <div class="relative aspect-square bg-gray-100 rounded overflow-hidden group">
+    <div
+      class="relative aspect-square bg-gray-100 rounded overflow-hidden group"
+      onClick={() => onSelect(selected ? null : asset.id)}
+    >
       <img
         src={asset.urls.thumbnail}
         alt={asset.originalFilename}
@@ -54,11 +63,17 @@ function ImageTile(
           Cover
         </div>
       )}
-      {/* Hover overlay */}
-      <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+      {/* Overlay: hover shows visually on desktop; buttons only active when selected */}
+      <div
+        class={`absolute inset-0 bg-black/40 transition-opacity flex items-center justify-center gap-1 ${
+          selected
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none group-hover:opacity-100"
+        }`}
+      >
         <button
           type="button"
-          onClick={() => setShowSizes(true)}
+          onClick={(e) => { e.stopPropagation(); setShowSizes(true); }}
           class="px-2 py-1 text-xs font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700"
         >
           Insert
@@ -67,7 +82,7 @@ function ImageTile(
           ? (
             <button
               type="button"
-              onClick={onClearCover}
+              onClick={(e) => { e.stopPropagation(); onClearCover(); }}
               class="px-2 py-1 text-xs font-medium text-white bg-gray-600 rounded hover:bg-gray-700"
             >
               Remove
@@ -76,8 +91,10 @@ function ImageTile(
           : (
             <button
               type="button"
-              onClick={() =>
-                onSetCover(`${globalThis.location.origin}${asset.urls.large}`)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSetCover(`${globalThis.location.origin}${asset.urls.large}`);
+              }}
               class="px-2 py-1 text-xs font-medium text-white bg-emerald-600 rounded hover:bg-emerald-700"
             >
               Set cover
@@ -183,10 +200,10 @@ function MetaTab(
 }
 
 function ImagesTab(
-  { buffer, onBufferChange }: Pick<
+  { buffer, onBufferChange, selectedId, onSelect }: Pick<
     MetadataPaneProps,
     "buffer" | "onBufferChange"
-  >,
+  > & { selectedId: string | null; onSelect: (id: string | null) => void },
 ) {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useAssets();
   const upload = useUploadAsset();
@@ -217,6 +234,8 @@ function ImagesTab(
             <ImageTile
               key={asset.id}
               asset={asset}
+              selected={selectedId === asset.id}
+              onSelect={onSelect}
               isCover={!!buffer.coverImage &&
                 buffer.coverImage ===
                   `${globalThis.location.origin}${asset.urls.large}`}
@@ -253,6 +272,12 @@ export function MetadataPane(
     class: extraClass,
   }: MetadataPaneProps,
 ) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedId(null);
+  }, [activeTab]);
+
   return (
     <div
       class={`w-full md:w-72 border-l border-gray-200 bg-white flex flex-col overflow-y-auto ${
@@ -278,7 +303,14 @@ export function MetadataPane(
             onSwitchToImages={onSwitchToImages}
           />
         )
-        : <ImagesTab buffer={buffer} onBufferChange={onBufferChange} />}
+        : (
+          <ImagesTab
+            buffer={buffer}
+            onBufferChange={onBufferChange}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
+        )}
     </div>
   );
 }

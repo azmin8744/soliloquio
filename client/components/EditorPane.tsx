@@ -19,7 +19,7 @@ interface EditorPaneProps {
   activeMetaTab: MetaPaneTab;
   onToggleMetaTab: (tab: MetaPaneTab) => void;
   onBack?: () => void;
-  onNavigateToMeta?: (tab: MetaPaneTab) => void;
+  onNavigateToMeta?: () => void;
   class?: string;
 }
 
@@ -188,7 +188,7 @@ export function EditorPane({
                   title="Metadata"
                   onClick={() => {
                     onToggleMetaTab("meta");
-                    onNavigateToMeta?.("meta");
+                    if (!metaActive) onNavigateToMeta?.();
                   }}
                   class={`p-1.5 rounded transition-colors ${
                     metaActive
@@ -217,7 +217,7 @@ export function EditorPane({
                   title="Images"
                   onClick={() => {
                     onToggleMetaTab("images");
-                    onNavigateToMeta?.("images");
+                    if (!imgActive) onNavigateToMeta?.();
                   }}
                   class={`p-1.5 rounded transition-colors ${
                     imgActive
