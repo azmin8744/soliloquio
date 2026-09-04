@@ -1,4 +1,4 @@
-FROM denoland/deno:2.7.12
+FROM denoland/deno:2.9.6
 WORKDIR /app
 COPY . .
 RUN deno task build

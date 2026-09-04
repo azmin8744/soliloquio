@@ -1,6 +1,6 @@
 services:
   database:
-    image: paradedb/paradedb:0.22.5
+    image: paradedb/paradedb:v0.25.6
     restart: always
     ports:
       - 5432:5432
