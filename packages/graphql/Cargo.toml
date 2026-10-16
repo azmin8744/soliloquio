@@ -14,11 +14,11 @@ uuid = { version = "1.9.1", features = [ "v4", "fast-rng", "macro-diagnostics" ]
 models = { path = "../models" }
 services = { path = "../services" }
 password-hash = { version = "0.6.0", default-features = false, features = ["rand_core"] }
-argon2 = { version = "0.5.3", features = ["default"] }
+argon2 = { version = "0.6.0", features = ["default"] }
 futures-util = "0.3.0"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-base64 = { version = "^0.22.1" }
+base64 = { version = "^0.23.0" }
 pulldown-cmark = "0.13"
 dashmap = "6.1"
 tracing = "0.1"
